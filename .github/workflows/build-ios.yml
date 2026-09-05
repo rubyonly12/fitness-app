@@ -135,7 +135,7 @@ jobs:
               plistlib.dump(data, f)
           print("patched pbxproj: app target manual, pods automatic")
           PY
-          plutil -convert ascii1 project.pbxproj
+          # project.pbxproj 保持 XML plist 格式即可，xcodebuild 可读
           cd ../../..
 
       - name: Build & archive
