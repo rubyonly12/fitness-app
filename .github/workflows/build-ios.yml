@@ -31,16 +31,21 @@ jobs:
           echo "$P12_BASE64" | base64 -d > /tmp/cert.p12
           echo "$MOBILEPROV_BASE64" | base64 -d > /tmp/profile.mobileprovision
 
-          # 从描述文件里提取 Team ID、Profile 名称、UUID、导出方式
+          # 解析描述文件
           security cms -D -i /tmp/profile.mobileprovision > /tmp/profile.plist 2>/dev/null
+
+          # Team ID 优先用 ApplicationIdentifierPrefix（app ID 前缀，用于匹配），否则用 TeamIdentifier
+          APP_PREFIX=$(/usr/libexec/PlistBuddy -c "Print :ApplicationIdentifierPrefix:0" /tmp/profile.plist 2>/dev/null)
           TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" /tmp/profile.plist 2>/dev/null)
           if [ -z "$TEAM_ID" ]; then
             TEAM_ID=$(grep -a -A1 '<key>TeamIdentifier</key>' /tmp/profile.mobileprovision | grep -o '[A-Z0-9]\{10\}' | head -1)
           fi
+          if [ -n "$APP_PREFIX" ]; then TEAM_ID="$APP_PREFIX"; fi
+
           PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist 2>/dev/null)
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist 2>/dev/null)
 
-          # 根据描述文件类型判断导出方式：ProvisionsAllDevices=true 是 ad-hoc，否则按 development
+          # 根据描述文件类型判断导出方式：ProvisionsAllDevices=true 是 ad-hoc，否则 development
           if [ "$(/usr/libexec/PlistBuddy -c 'Print :ProvisionsAllDevices' /tmp/profile.plist 2>/dev/null)" = "true" ]; then
             EXPORT_METHOD="ad-hoc"
           else
@@ -70,12 +75,70 @@ jobs:
           security list-keychains -d user -s build.keychain
           security default-keychain -s build.keychain
 
-          # 从钥匙串里读取签名证书名称（Codesign 身份）
+          # 从钥匙串读取签名身份（证书名）
           SIGN_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep -o '"[^"]*"' | head -1 | tr -d '"')
           echo "SIGN_IDENTITY=$SIGN_IDENTITY"
           echo "SIGN_IDENTITY=$SIGN_IDENTITY" >> "$GITHUB_ENV"
 
-      - name: Build & archive (manual signing)
+      - name: Patch Xcode signing (App=manual, Pods=automatic)
+        run: |
+          cd ios/App/App.xcodeproj
+          plutil -convert xml1 project.pbxproj
+          TEAM_ID="$TEAM_ID" SIGN_IDENTITY="$SIGN_IDENTITY" PROFILE_NAME="$PROFILE_NAME" python3 - <<'PY'
+          import plistlib, os
+          TEAM = os.environ["TEAM_ID"]
+          SIGN = os.environ["SIGN_IDENTITY"]
+          PROFILE = os.environ["PROFILE_NAME"]
+          with open("project.pbxproj", "rb") as f:
+              data = plistlib.load(f)
+          objects = data.get("objects", {})
+          app_ids = set()
+          for oid, obj in objects.items():
+              if isinstance(obj, dict) and obj.get("isa") == "PBXNativeTarget":
+                  if obj.get("productType") == "com.apple.product-type.application":
+                      app_ids.add(oid)
+          def patch(oid, is_app):
+              obj = objects.get(oid)
+              if not isinstance(obj, dict): return
+              bcl = obj.get("buildConfigurationList")
+              bcl_obj = objects.get(bcl)
+              if not isinstance(bcl_obj, dict): return
+              for bcid in bcl_obj.get("buildConfigurations", []):
+                  bco = objects.get(bcid)
+                  if not isinstance(bco, dict): continue
+                  bs = bco.setdefault("buildSettings", {})
+                  if is_app:
+                      bs["CODE_SIGN_STYLE"] = "Manual"
+                      bs["DEVELOPMENT_TEAM"] = TEAM
+                      bs["CODE_SIGN_IDENTITY"] = SIGN
+                      bs["PROVISIONING_PROFILE_SPECIFIER"] = PROFILE
+                  else:
+                      bs["CODE_SIGN_STYLE"] = "Automatic"
+                      bs["DEVELOPMENT_TEAM"] = TEAM
+                      bs.pop("PROVISIONING_PROFILE_SPECIFIER", None)
+          for oid, obj in objects.items():
+              if isinstance(obj, dict) and obj.get("isa") == "PBXNativeTarget":
+                  patch(oid, oid in app_ids)
+          # 清理 project 级别的残留描述文件设置
+          for oid, obj in objects.items():
+              if isinstance(obj, dict) and obj.get("isa") == "PBXProject":
+                  bcl = obj.get("buildConfigurationList")
+                  bcl_obj = objects.get(bcl)
+                  if isinstance(bcl_obj, dict):
+                      for bcid in bcl_obj.get("buildConfigurations", []):
+                          bco = objects.get(bcid)
+                          if not isinstance(bco, dict): continue
+                          bs = bco.setdefault("buildSettings", {})
+                          bs["DEVELOPMENT_TEAM"] = TEAM
+                          bs.pop("PROVISIONING_PROFILE_SPECIFIER", None)
+          with open("project.pbxproj", "wb") as f:
+              plistlib.dump(data, f)
+          print("patched pbxproj: app target manual, pods automatic")
+          PY
+          plutil -convert ascii1 project.pbxproj
+          cd ../../..
+
+      - name: Build & archive
         run: |
           cd ios/App
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=$TEAM_ID CODE_SIGN_IDENTITY="$SIGN_IDENTITY" PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
