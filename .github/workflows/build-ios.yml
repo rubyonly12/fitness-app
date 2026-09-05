@@ -141,7 +141,8 @@ jobs:
       - name: Build & archive
         run: |
           cd ios/App
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=$TEAM_ID CODE_SIGN_IDENTITY="$SIGN_IDENTITY" PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
+          # 签名设置已写入 project.pbxproj（App=manual，Pods=automatic），命令行不再全局覆盖
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive
 
       - name: Export IPA
         run: |
@@ -157,7 +158,7 @@ jobs:
             <key>signingCertificate</key><string>$SIGN_IDENTITY</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>com.yi.fitness</key><string>$PROFILE_NAME</string>
+              <key>com.VScEc.Pwr37a.fitness</key><string>$PROFILE_NAME</string>
             </dict>
           </dict>
           </plist>
