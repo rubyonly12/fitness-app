@@ -1,0 +1,13 @@
+node_modules/
+*.log
+.DS_Store
+android/app/build/
+android/.gradle/
+ios/App/build/
+ios/App/Pods/
+
+# signing secrets — NEVER upload these
+certs/
+
+# not needed for the iOS cloud build
+android/

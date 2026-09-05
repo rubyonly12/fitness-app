@@ -1,0 +1,75 @@
+name: Build iOS IPA (Capacitor)
+
+on:
+  workflow_dispatch:        # 在 GitHub 网页上点一下就能触发
+  push:
+    branches: [ main ]
+
+jobs:
+  ios:
+    runs-on: macos-latest   # GitHub 提供的云 Mac
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Decode signing files
+        run: |
+          echo "${{ secrets.P12_BASE64 }}" | base64 -d > /tmp/cert.p12
+          echo "${{ secrets.MOBILEPROV_BASE64 }}" | base64 -d > /tmp/profile.mobileprovision
+          # 从描述文件里自动提取 Team ID（无需你手动填）
+          security cms -D -i /tmp/profile.mobileprovision > /tmp/profile.plist 2>/dev/null
+          TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" /tmp/profile.plist 2>/dev/null)
+          if [ -z "$TEAM_ID" ]; then
+            TEAM_ID=$(grep -a -A1 '<key>TeamIdentifier</key>' /tmp/profile.mobileprovision | grep -o '[A-Z0-9]\{10\}' | head -1)
+          fi
+          echo "TEAM_ID=$TEAM_ID"
+          echo "TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Import certificate to keychain
+        run: |
+          security create-keychain -p "" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import /tmp/cert.p12 -k build.keychain -P "${{ secrets.P12_PASSWORD }}" -T /usr/bin/codesign -T /usr/bin/xcodebuild -f pkcs12
+          security list-keychains -d user -s build.keychain login.keychain-db
+          security default-keychain -s build.keychain
+
+      - name: Build & archive (automatic signing)
+        run: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive CODE_SIGN_STYLE=automatic DEVELOPMENT_TEAM=$TEAM_ID
+
+      - name: Export IPA (ad-hoc)
+        run: |
+          cd ios/App
+          cat > ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>ad-hoc</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamId</key><string>$TEAM_ID</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fitness-ipa
+          path: ios/App/build/ipa/*.ipa

@@ -1,0 +1,13 @@
+{
+  "appId": "com.yi.fitness",
+  "appName": "锻炼",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}
