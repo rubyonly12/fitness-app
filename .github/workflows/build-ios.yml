@@ -158,7 +158,7 @@ jobs:
             <key>signingCertificate</key><string>$SIGN_IDENTITY</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>com.VScEc.Pwr37a.fitness</key><string>$PROFILE_NAME</string>
+              <key>com.VScEe.FWrJ7s</key><string>$PROFILE_NAME</string>
             </dict>
           </dict>
           </plist>
