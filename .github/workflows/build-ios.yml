@@ -8,6 +8,7 @@ on:
 jobs:
   ios:
     runs-on: macos-latest   # GitHub 提供的云 Mac
+    timeout-minutes: 40     # 防止卡死时白等 6 小时
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,6 +75,8 @@ jobs:
           security import /tmp/cert.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/xcodebuild -f pkcs12
           security list-keychains -d user -s build.keychain
           security default-keychain -s build.keychain
+          # 关键：设置 partition list，否则 codesign 会弹权限框导致 CI 卡死
+          security set-key-partition-list -S apple-tool:,apple: -k "" build.keychain
 
           # 从钥匙串读取签名身份（证书名）
           SIGN_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep -o '"[^"]*"' | head -1 | tr -d '"')
