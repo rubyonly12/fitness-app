@@ -693,6 +693,10 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
         <div class="setrow" onclick="toast('通知设置即将开放')" data-page-node-id="d4eIHzp4Zn3ymA8zrF7LFM"><span class="ic" data-page-node-id="GHlrpZJbEk6RBMLcGNXBFF">🔔</span><span class="t" data-page-node-id="e2UB1qwrVgXnxY2Xd8nPa8">通知</span><span class="arr" data-page-node-id="xzCvv7ZLAbrguAS5rXtqFi">›</span></div>
         <div class="setrow" style="border-bottom:none;" onclick="resetAll()" data-page-node-id="zRw5wjcbtlRZUj2xIIU8an"><span class="ic" data-page-node-id="sNjfw5btSW8NFecpXIEWHM">🧹</span><span class="t" data-page-node-id="l8a3KesPGASWyhEuhAClsP">清除全部数据</span><span class="arr" data-page-node-id="CxJbNtOqza8P6UclgLHlxq">›</span></div>
       </div>
+      <div class="card" style="padding:6px 14px;margin-top:12px;" data-page-node-id="bkDataXfer">
+        <div class="setrow" onclick="exportData()" data-page-node-id="bkExp1"><span class="ic">📤</span><span class="t">导出数据（备份 / 换手机）</span><span class="arr">›</span></div>
+        <div class="setrow" style="border-bottom:none;" onclick="importData()" data-page-node-id="bkImp1"><span class="ic">📥</span><span class="t">导入数据</span><span class="arr">›</span></div>
+      </div>
     </div>
   </div>
 
@@ -3150,6 +3154,86 @@ function doReset(){
   document.getElementById('setWaterGoal').textContent='2000 ml';
   document.getElementById('setAi').textContent='未配置';
   toast('数据已全部清除');
+}
+
+/* ================= 数据导出 / 导入（无需账号，本地文件搬运） ================= */
+function copyText(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.select();
+  try{ document.execCommand('copy'); }catch(e){
+    if(navigator.clipboard) navigator.clipboard.writeText(el.value).catch(function(){});
+  }
+}
+function showExportFallback(json){
+  openModal(
+    '<h3>导出健身数据</h3>'+
+    '<p class="note" style="margin:6px 0 10px;">把下面的内容复制，通过隔空投送 / 微信发到另一台手机，再用「导入数据」粘贴即可。</p>'+
+    '<textarea id="expBox" readonly style="width:100%;height:220px;font-size:12px;"></textarea>'+
+    '<div style="margin-top:10px;">'+
+    '<button class="btn-primary" onclick="copyText(\'expBox\');toast(\'已复制，去另一台手机粘贴\')">复制全部</button> '+
+    '<button class="btn-ghost" onclick="closeModal()">关闭</button></div>'
+  );
+  document.getElementById('expBox').value = json;
+}
+function exportData(){
+  const json = JSON.stringify(state);
+  const fname = 'volumex-'+new Date().toISOString().slice(0,10)+'.json';
+  if(navigator.share){
+    try{
+      const file = new File([json], fname, {type:'application/json'});
+      const can = navigator.canShare ? navigator.canShare({files:[file]}) : true;
+      if(can){
+        navigator.share({files:[file], title:'健身数据备份'})
+          .then(function(){})
+          .catch(function(){ showExportFallback(json); });
+        return;
+      }
+    }catch(e){ /* 落到下面的回退方案 */ }
+  }
+  showExportFallback(json);
+}
+function importData(){
+  openModal(
+    '<h3>导入健身数据</h3>'+
+    '<p class="note" style="margin:6px 0 10px;">二选一：① 选择之前导出的 .json 文件；② 把另一台手机发来的文本粘贴到下面框里。导入会覆盖当前本地数据。</p>'+
+    '<input type="file" id="impFile" accept="application/json,.json" style="width:100%;margin-bottom:10px;" onchange="importFromFile(this)">'+
+    '<textarea id="impBox" placeholder="在此粘贴健身数据 JSON…" style="width:100%;height:160px;font-size:12px;"></textarea>'+
+    '<div style="margin-top:10px;">'+
+    '<button class="btn-primary" onclick="importFromText()">导入并覆盖本地数据</button> '+
+    '<button class="btn-ghost" onclick="closeModal()">取消</button></div>'
+  );
+}
+function importFromFile(input){
+  const f = input.files && input.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = function(){ doImport(r.result); };
+  r.readAsText(f);
+}
+function importFromText(){
+  const t = document.getElementById('impBox').value.trim();
+  if(!t){ toast('请先选择文件或粘贴内容'); return; }
+  doImport(t);
+}
+function doImport(text){
+  let obj;
+  try { obj = JSON.parse(text); }catch(e){ toast('不是有效的 JSON 数据'); return; }
+  if(!obj || typeof obj !== 'object'){ toast('数据格式不正确'); return; }
+  // 用默认值兜底，避免缺字段导致界面报错
+  state = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT)), obj);
+  if(state._ts === undefined) state._ts = {};
+  save();
+  refreshMacros(); renderTrend(); renderHealth(); renderSwim();
+  document.getElementById('planCountHome').textContent=state.plans.length;
+  document.getElementById('plansCount').textContent=state.plans.length+' / 6';
+  document.getElementById('setWaterGoal').textContent=state.waterGoal+' ml';
+  if(state.weights.length) document.getElementById('setWeight').textContent=state.weights[state.weights.length-1].kg+' kg';
+  if(state.ai.key) document.getElementById('setAi').textContent='已连接';
+  renderFoodDb(); renderLibTabs(); renderLib();
+  switchTab('rookie');
+  closeModal();
+  toast('导入成功');
 }
 
 /* ================= 初始化 ================= */
