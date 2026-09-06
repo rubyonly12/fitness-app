@@ -46,11 +46,12 @@ jobs:
           PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist 2>/dev/null)
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist 2>/dev/null)
 
-          # 根据描述文件类型判断导出方式：ProvisionsAllDevices=true 是 ad-hoc，否则 development
-          if [ "$(/usr/libexec/PlistBuddy -c 'Print :ProvisionsAllDevices' /tmp/profile.plist 2>/dev/null)" = "true" ]; then
-            EXPORT_METHOD="ad-hoc"
-          else
+          # 根据描述文件的 get-task-allow 判断导出方式：true=development，false=ad-hoc
+          GET_TASK=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:get-task-allow" /tmp/profile.plist 2>/dev/null)
+          if [ "$GET_TASK" = "true" ]; then
             EXPORT_METHOD="development"
+          else
+            EXPORT_METHOD="ad-hoc"
           fi
 
           echo "TEAM_ID=$TEAM_ID"
