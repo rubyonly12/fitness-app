@@ -2738,7 +2738,7 @@ function swimEqFood(kcal){
 }
 function sameMonth(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth(); }
 function sameYear(a,b){ return a.getFullYear()===b.getFullYear(); }
-function swimCount(rec,S){
+function swimCount(rec,S,idx){
   const rd = new Date(rec.d+'T00:00:00');
   let cm=0,cy=0;
   S.hist.forEach(function(x){
@@ -2746,7 +2746,16 @@ function swimCount(rec,S){
     if(sameMonth(xd,rd)) cm++;
     if(sameYear(xd,rd)) cy++;
   });
-  return {m:cm,y:cy};
+  // 按日期排序后，确定这条记录是全部游泳历史中的第几次（从 1 开始）
+  let ca = 0;
+  if(typeof idx === 'number' && idx >= 0 && S.hist[idx] === rec){
+    ca = idx + 1; // S.hist 已按日期排序，下标即名次
+  } else {
+    const sorted = S.hist.slice().sort(function(a,b){ return a.d<b.d?-1:1; });
+    const pos = sorted.findIndex(function(x){ return x.d === rec.d; });
+    ca = pos + 1;
+  }
+  return {m:cm,y:cy,a:ca};
 }
 function fmtHm(mins){
   const h=Math.floor(mins/60)%24, m=Math.round(mins%60);
@@ -2965,7 +2974,7 @@ function swimDetail(i){
   SWIM_DETAIL_IDX=i;
   const r=enrichSwim(swimOf().hist[i]);
   const S=swimOf();
-  const cnt=swimCount(r,S);
+  const cnt=swimCount(r,S,i);
   const rd=new Date(r.d+'T00:00:00');
   const monthName=(rd.getMonth()+1)+'月';
   const dateStr=r.d+' '+(r.t0?r.t0+'-'+r.t1:'');
@@ -3019,7 +3028,7 @@ function swimDetail(i){
     +'<div class="big">'+r.dist.toLocaleString()+'<span>m</span></div>'
     +'<div class="title">'+r.style+'</div>'
     +'<div class="time">'+dateStr+'</div>'
-    +'<div class="count">🏆 第 '+cnt.m+' 次 · 这是你 '+monthName+' 的第 '+cnt.m+' 次 '+r.style+'，同时也是 '+rd.getFullYear()+' 全年累计的第 '+cnt.y+' 次。</div>'
+    +'<div class="count">🏆 第 '+cnt.a+' 次 · 这是你 '+monthName+' 的第 '+cnt.m+' 次 '+r.style+'，同时也是 '+rd.getFullYear()+' 全年累计的第 '+cnt.y+' 次。</div>'
     +'</div>'
     +'<div class="swimgrid">'
     +'<div class="sg"><div class="v">'+(r.kcal||0)+'</div><div class="u">千卡</div></div>'
