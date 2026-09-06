@@ -2807,8 +2807,9 @@ function detectSwimStyle(r){
   return '游泳';                        // 数据异常或极慢，保持通用
 }
 function enrichSwim(r){
-  // 未填写或通用泳姿时，根据配速自动识别
-  if(!r.style || r.style === '游泳') r.style = detectSwimStyle(r);
+  // 泳姿以真实来源为准：Health 同步记录沿用其「泳池游泳 / 公开水域 / 游泳」
+  // 等真实类型；手动记录在添加时已由用户选定。仅当完全没有泳姿时才用配速兜底。
+  if(!r.style) r.style = detectSwimStyle(r);
   if(!r.kcal) r.kcal=Math.round(r.mins*9.2);
   if(!r.pace) r.pace=+(r.mins/(r.dist/100)).toFixed(2);
   if(!r.intensity) r.intensity=swimIntensity(r);
