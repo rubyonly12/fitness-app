@@ -805,6 +805,25 @@ const DEFAULT = {
 let state = load();
 
 /* ============ CloudKit 私有数据库同步（iOS 原生；不可用时自动回退本地） ============ */
+/* 同步策略：按时间戳逐字段合并 —— 每个数据块各自记录最后修改时间，
+   加载/合并时各块取较新版本，避免两台设备离线改动互相整体覆盖。 */
+const _SECTIONS = Object.keys(DEFAULT);   // 需要按时间戳合并的数据块
+let _lastSaved = null;                     // 上次存盘时的 state 快照，用于差分出改动过的块
+function _clone(o){ try { return JSON.parse(JSON.stringify(o)); } catch(e){ return {}; } }
+function _bumpTs(){
+  if(!state._ts) state._ts = {};
+  const cur = _clone(state);
+  if(!_lastSaved) _lastSaved = cur;
+  for(const k of _SECTIONS){
+    // 仅当该数据块相对上次存盘确实被改动时才刷新时间戳；
+    // 未被改动的块不更新时间戳，避免“假的新近修改”去覆盖另一台设备对同一块的真实改动
+    const changed = JSON.stringify(cur[k]) !== JSON.stringify(_lastSaved[k]);
+    if(changed){
+      state._ts[k] = Date.now();
+    }
+  }
+  _lastSaved = cur;
+}
 function cloudAvailable(){
   try {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()
@@ -820,25 +839,53 @@ function cloudSave(){
     try { window.Capacitor.Plugins.CloudKitSync.save({ value: json }).catch(function(){}); } catch(e){}
   }, 1500);
 }
+function _stampLocalEdits(){
+  if(!state._ts) state._ts = {};
+  for(const k of _SECTIONS){
+    // 本地有改动（与默认值不同）但尚未打过时间戳的块：补一个基线时间戳，
+    // 避免“本地真实改动”因 _ts=0 而在合并时被对方未改动的块平局覆盖
+    if(!state._ts[k] && JSON.stringify(state[k]) !== JSON.stringify(DEFAULT[k])){
+      state._ts[k] = Date.now();
+    }
+  }
+}
 async function cloudLoad(){
-  if(!cloudAvailable()) return;
+  // 不论云端是否可用，都先建立 _lastSaved 基线，保证后续 save 只差分真正改动的块
+  if(!cloudAvailable()){ _stampLocalEdits(); _lastSaved = _clone(state); return; }
   try {
     const res = await window.Capacitor.Plugins.CloudKitSync.fetch({});
     const v = res && res.value;
     if(v && v.length){
       const remote = JSON.parse(v);
       if(remote && typeof remote === 'object'){
-        // 云端优先：加载时用云端覆盖本地（个人单用户跨设备同步，最后加载者胜出）
-        state = Object.assign({}, DEFAULT, remote);
+        const lts = state._ts || {};
+        const rts = remote._ts || {};
+        const merged = {};
+        for(const k of _SECTIONS){
+          const lt = lts[k] || 0, rt = rts[k] || 0;
+          // 较新者胜出；时间戳相等时保留本地（避免误覆盖当前屏幕上的数据）
+          merged[k] = (rt > lt) ? remote[k] : state[k];
+        }
+        // 合并时间戳（各块取较新）
+        const newTs = {};
+        for(const k of _SECTIONS){ newTs[k] = Math.max(lts[k] || 0, rts[k] || 0); }
+        // 云端有、本地 DEFAULT 没有的块也补上
+        for(const k of Object.keys(remote)){
+          if(!(k in merged) && k !== '_ts') merged[k] = remote[k];
+        }
+        merged._ts = newTs;
+        state = Object.assign({}, DEFAULT, merged);
       }
     }
   } catch(e){ /* 忽略：保留本地数据 */ }
+  _stampLocalEdits();
+  _lastSaved = _clone(state);
 }
 function load(){
   try{ const s=localStorage.getItem('volumex'); if(s) return Object.assign(JSON.parse(JSON.stringify(DEFAULT)), JSON.parse(s)); }catch(e){}
   return JSON.parse(JSON.stringify(DEFAULT));
 }
-function save(){ try{ localStorage.setItem('volumex', JSON.stringify(state)); }catch(e){} }
+function save(){ try{ localStorage.setItem('volumex', JSON.stringify(state)); }catch(e){} _bumpTs(); cloudSave(); }
 
 /* ================= 导航 ================= */
 const pages = document.querySelectorAll('.page');
