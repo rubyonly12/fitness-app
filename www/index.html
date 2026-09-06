@@ -2598,6 +2598,9 @@ function syncSwimHealth(){
   if(!hkAvail()){ openSwimNoNative(); return; }
   const h = window.cordova.plugins.health;
   const S = swimOf();
+  // HealthKit 识别的泳姿（iOS 17+ HKWorkout.swimmingStrokeStyles）-> 中文
+  // other 不在此表，回退到「泳池游泳 / 公开水域」标签
+  const STROKE_CN = { freestyle:'自由泳', backstroke:'仰泳', breaststroke:'蛙泳', butterfly:'蝶泳', mixed:'混合泳' };
   toast('正在同步游泳记录…');
   h.requestAuthorization({
     read:['activity','distance','calories.active']
@@ -2624,7 +2627,9 @@ function syncSwimHealth(){
         const mins=Math.max(1, Math.round((ed-sd)/60000));
         const dist=Math.round(x.distance||0);
         const kcal=Math.round(x.calories||0);
-        const style = v==='swimming.open_water'?'公开水域':v==='swimming.pool'?'泳池游泳':'游泳';
+        // 优先使用 HealthKit 识别出的具体泳姿；识别不到或 other 时回退到通用标签
+        let style = v==='swimming.open_water'?'公开水域':v==='swimming.pool'?'泳池游泳':'游泳';
+        if(x.strokeStyle && STROKE_CN[x.strokeStyle]) style = STROKE_CN[x.strokeStyle];
         const rec={
           d: sd.toISOString().slice(0,10),
           style: style,

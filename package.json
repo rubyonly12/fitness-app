@@ -8,7 +8,8 @@
     "add:android": "cap add android",
     "add:ios": "cap add ios",
     "build:android": "cap sync && cap build android",
-    "build:ios": "cap sync && cap build ios"
+    "build:ios": "cap sync && cap build ios",
+    "patch:health": "node scripts/sync-health-patch.js"
   },
   "devDependencies": {
     "@capacitor/android": "^6.1.2",
@@ -19,6 +20,6 @@
     "@capacitor/local-notifications": "^6.1.0"
   },
   "dependencies": {
-    "cordova-plugin-health": "^3.2.4"
+    "cordova-plugin-health": "3.2.4"
   }
 }
