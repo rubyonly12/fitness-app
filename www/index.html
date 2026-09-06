@@ -2174,21 +2174,65 @@ function saveAiCfg(){
   document.getElementById('setAi').textContent = state.ai.key?'已连接':'未配置';
   toast(state.ai.key?'AI 服务已连接 ✨':'已保存（未填 Key，识别将使用演示结果）');
 }
+/* 把原图压缩到长边 maxSide，降低接口超限/超时概率 */
+function shrinkImage(dataUrl, maxSide, cb){
+  try{
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var w=img.width,h=img.height;
+        var s=Math.min(1, maxSide/Math.max(w,h));
+        var cw=Math.max(1,Math.round(w*s)), ch=Math.max(1,Math.round(h*s));
+        var c=document.createElement('canvas'); c.width=cw; c.height=ch;
+        var ctx=c.getContext('2d'); ctx.drawImage(img,0,0,cw,ch);
+        cb(c.toDataURL('image/jpeg',0.82));
+      }catch(e){ cb(dataUrl); }
+    };
+    img.onerror=function(){ cb(dataUrl); };
+    img.src=dataUrl;
+  }catch(e){ cb(dataUrl); }
+}
+/* 调视觉大模型；回调 cb(errMsg|null, items|null) —— 失败时明确告诉你原因，不再静默回退 */
 function callAI(imgDataUrl, cb){
+  const url=(state.ai.url||'').replace(/\/+$/,'')+'/chat/completions';
   const body={model:state.ai.model||'gpt-4o-mini', max_tokens:900,
     messages:[{role:'user',content:[
       {type:'text',text:'识别图片中的食物。只返回 JSON 数组，不要其他文字。每项格式 {"name":"食物名","kcal":数字,"p":蛋白质克数,"c":碳水克数,"f":脂肪克数}。'},
       {type:'image_url',image_url:{url:imgDataUrl}}]}]};
-  fetch((state.ai.url||'').replace(/\/+$/,'')+'/chat/completions',{
-    method:'POST',
+  const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+  const timer=ctl?setTimeout(function(){ ctl.abort(); },90000):null;
+  fetch(url,{method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+state.ai.key},
-    body:JSON.stringify(body)})
-  .then(function(r){ return r.json(); })
-  .then(function(j){
-    const t=j.choices[0].message.content;
+    body:JSON.stringify(body), signal:ctl?ctl.signal:undefined})
+  .then(function(r){
+    if(timer) clearTimeout(timer);
+    return r.text().then(function(txt){ return {status:r.status, txt:txt}; });
+  })
+  .then(function(res){
+    let j=null;
+    try{ j=JSON.parse(res.txt); }catch(e){
+      return cb('接口返回的不是 JSON（HTTP '+res.status+'），接口地址可能填错了。返回片段：'+res.txt.slice(0,120), null);
+    }
+    if(!res.ok){
+      const msg=(j&&j.error&&(j.error.message||j.error.code))||res.txt.slice(0,120);
+      return cb('接口报错 HTTP '+res.status+'：'+msg, null);
+    }
+    if(!j.choices || !j.choices[0] || !j.choices[0].message){
+      return cb('接口返回格式异常（缺少 choices）：'+res.txt.slice(0,120), null);
+    }
+    const t=j.choices[0].message.content||'';
     const m=t.match(/\[[\s\S]*\]/);
-    cb(m?JSON.parse(m[0]):null);
-  }).catch(function(){ cb(null); });
+    if(!m) return cb('模型没有返回 JSON 数组，可能该模型不支持看图片。原文：'+t.slice(0,100), null);
+    let items=null;
+    try{ items=JSON.parse(m[0]); }catch(e){ return cb('模型返回的内容不是合法 JSON：'+m[0].slice(0,100), null); }
+    cb(null, items);
+  })
+  .catch(function(e){
+    if(timer) clearTimeout(timer);
+    const msg=(e&&e.name==='AbortError')?'请求超时（90 秒），图片可能过大或接口响应太慢'
+      :((e&&e.message)?e.message:'网络不通或接口地址错误（国内直连 api.openai.com 通常不可用）');
+    cb('请求失败：'+msg, null);
+  });
 }
 /* 拍照 AI 识别 */
 let aiItems=[];
@@ -2228,13 +2272,29 @@ function addPhotoMeal(dataUrl){
 function aiAnalyze(){
   document.getElementById('modalBody').innerHTML='<h3>📷 识别中</h3>'
     + '<p style="text-align:center;padding:30px 0;font-size:16px;font-weight:900;color:var(--teal);">✨ AI 正在分析照片…</p>';
-  if(state.ai.key){
-    callAI(window.__photoSrc,function(items){
-      if(items && items.length) showAiEditor(items,false); else showAiEditor(demoItems(),true);
-    });
-  }else{
-    setTimeout(function(){ showAiEditor(demoItems(),true); },1200);
+  if(!state.ai.key){
+    setTimeout(function(){
+      openModal('<h3>⚠️ 还没配置 AI 接口</h3>'
+        + '<p class="note" style="margin-bottom:14px;">拍照识别需要你自己填一个<b>视觉大模型</b>的 API Key（OpenAI 兼容接口）。没配置时只能手动填写或用示例数据预览。</p>'
+        + '<button class="btn-primary" style="margin-bottom:10px;" onclick="openAiCfg()">去配置 AI 接口</button>'
+        + '<button class="btn-ghost" style="width:100%;" onclick="showAiEditor(demoItems(),true)">先用示例数据预览</button>');
+    },900);
+    return;
   }
+  shrinkImage(window.__photoSrc, 1024, function(smallUrl){
+    callAI(smallUrl, function(err, items){
+      if(err){
+        const safe=String(err).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        openModal('<h3>❌ 识别失败</h3>'
+          + '<p class="note" style="margin-bottom:14px;">'+safe+'</p>'
+          + '<button class="btn-primary" style="margin-bottom:10px;" onclick="openAiCfg()">检查 / 修改 AI 设置</button>'
+          + '<button class="btn-ghost" style="width:100%;" onclick="aiAnalyze()">重试</button>');
+        return;
+      }
+      if(items && items.length) showAiEditor(items,false);
+      else showAiEditor(demoItems(),true);
+    });
+  });
 }
 function demoItems(){
   return [{name:'示例：鸡胸肉沙拉',kcal:350,p:38,c:12,f:12},{name:'示例：全麦面包',kcal:120,p:4,c:22,f:2}];
