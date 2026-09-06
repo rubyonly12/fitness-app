@@ -887,9 +887,10 @@ static NSString *const HKPluginKeyUUID = @"UUID";
 
                         // 游泳：读取 HealthKit 识别出的泳姿（iOS 17+ 的 HKWorkout.swimmingStrokeStyles），
                         // 取出现次数最多的泳姿作为本次锻炼的主泳姿，写回 strokeStyle 字段。
+                        // 用 performSelector: 而非点语法，保证在旧版 SDK 也能编译。
                         if (workout.workoutActivityType == HKWorkoutActivityTypeSwimming &&
                             [workout respondsToSelector:@selector(swimmingStrokeStyles)]) {
-                            NSArray<NSNumber *> *styles = workout.swimmingStrokeStyles;
+                            NSArray *styles = [workout performSelector:@selector(swimmingStrokeStyles)];
                             if (styles.count > 0) {
                                 NSMutableDictionary *tally = [NSMutableDictionary dictionary];
                                 for (NSNumber *s in styles) {
