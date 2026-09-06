@@ -2772,7 +2772,7 @@ function renderSwim(){
     for(let i=1;i<=daysInMonth;i++){
       const k=new Date(y,m,i).toISOString().slice(0,10);
       const v=S.hist.filter(function(r){return r.d===k;}).reduce(function(a,r){return a+r.dist;},0);
-      bars.push({l:i%2===1?String(i):'',v:v});
+      bars.push({l:String(i),v:v});
     }
   } else {
     const y=now.getFullYear()-SWIM_OFFSET;
