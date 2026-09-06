@@ -2738,7 +2738,7 @@ function swimEqFood(kcal){
 }
 function sameMonth(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth(); }
 function sameYear(a,b){ return a.getFullYear()===b.getFullYear(); }
-function swimCount(rec,S,idx){
+function swimCount(rec,S){
   const rd = new Date(rec.d+'T00:00:00');
   let cm=0,cy=0;
   S.hist.forEach(function(x){
@@ -2747,13 +2747,10 @@ function swimCount(rec,S,idx){
     if(sameYear(xd,rd)) cy++;
   });
   // 按日期排序后，确定这条记录是全部游泳历史中的第几次（从 1 开始）
-  let ca = 0;
-  if(typeof idx === 'number' && idx >= 0 && S.hist[idx] === rec){
-    ca = idx + 1; // S.hist 已按日期排序，下标即名次
-  } else {
-    const sorted = S.hist.slice().sort(function(a,b){ return a.d<b.d?-1:1; });
-    const pos = sorted.findIndex(function(x){ return x.d === rec.d; });
-    ca = pos + 1;
+  const sorted = S.hist.slice().sort(function(a,b){ return a.d<b.d?-1:1; });
+  let ca = sorted.findIndex(function(x){ return x === rec; }) + 1;
+  if(ca === 0){ // 对象引用不一致时按日期兜底（适合导入/克隆场景）
+    ca = sorted.findIndex(function(x){ return x.d === rec.d; }) + 1;
   }
   return {m:cm,y:cy,a:ca};
 }
@@ -2800,7 +2797,18 @@ function swimMets(rec){
 }
 function swimMetsLabel(mets){ return mets<3.0?'轻度':mets<=6.0?'中度':'高强度'; }
 function swimIntensity(rec){ return rec.intensity || swimMets(rec); }
+function detectSwimStyle(r){
+  if(!r.dist || !r.mins || r.dist <= 0 || r.mins <= 0) return '游泳';
+  const pace = r.mins / (r.dist / 100); // 分钟/100米
+  if(pace < 2.0) return '自由泳';       // 较快，常见为自由泳（也可能是蝶泳，但自由泳更普遍）
+  if(pace < 2.75) return '仰泳';        // 中等偏慢，仰泳常见区间
+  if(pace < 3.5) return '蛙泳';         // 较慢，典型蛙泳配速
+  if(pace < 4.5) return '蛙泳';         // 更慢，休闲蛙泳
+  return '游泳';                        // 数据异常或极慢，保持通用
+}
 function enrichSwim(r){
+  // 未填写或通用泳姿时，根据配速自动识别
+  if(!r.style || r.style === '游泳') r.style = detectSwimStyle(r);
   if(!r.kcal) r.kcal=Math.round(r.mins*9.2);
   if(!r.pace) r.pace=+(r.mins/(r.dist/100)).toFixed(2);
   if(!r.intensity) r.intensity=swimIntensity(r);
@@ -2974,7 +2982,7 @@ function swimDetail(i){
   SWIM_DETAIL_IDX=i;
   const r=enrichSwim(swimOf().hist[i]);
   const S=swimOf();
-  const cnt=swimCount(r,S,i);
+  const cnt=swimCount(r,S);
   const rd=new Date(r.d+'T00:00:00');
   const monthName=(rd.getMonth()+1)+'月';
   const dateStr=r.d+' '+(r.t0?r.t0+'-'+r.t1:'');
@@ -3041,6 +3049,7 @@ function swimDetail(i){
     +'<div class="swimfood"><span class="e">'+food.e+'</span><span>同等消耗 · '+food.t+'</span></div>'
     +'<div class="swimsect">'
     +'<h4>更多数据</h4>'
+    +'<div class="swimrow"><span class="lab">泳姿</span><span class="val">'+(r.style||'游泳')+'</span></div>'
     +'<div class="swimrow"><span class="lab">泳池长度</span><span class="val">'+(r.poolLen||25)+' 米</span></div>'
     +'<div class="swimrow"><span class="lab">划水频率</span><span class="val">'+(r.strokeFreq||0)+' 次/分钟</span></div>'
     +'<div class="swimrow"><span class="lab">平均心率</span><span class="val">'+(r.avgHR||0)+' BPM</span></div>'
