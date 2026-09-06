@@ -2,7 +2,7 @@
 <html lang="zh-CN" data-page-node-id="1yRycxEyBazWRZJkqAebBf">
 <head data-page-node-id="zTABdP0iVtFjf1O31yfLZ5">
 <meta charset="UTF-8" data-page-node-id="p2MekPibccboiOs285K7R3">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" data-page-node-id="T3exOt48hHVdtRYqEgwPWE">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" data-page-node-id="T3exOt48hHVdtRYqEgwPWE">
 <title>VolumeX 健身</title>
 <meta name="theme-color" content="#3f7d5c">
 <meta name="description" content="训练计划、动作库、饮食记录与游泳记录的个人健身助手">
@@ -51,7 +51,7 @@ body{
   .phone{max-width:none;height:100vh;height:100dvh;border-radius:0;box-shadow:none;}
 }
 #pages{flex:1;overflow:hidden;position:relative;}
-.page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:6px 18px 110px;display:none;scrollbar-width:none;}
+.page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:calc(6px + env(safe-area-inset-top,0px)) 18px 110px;display:none;scrollbar-width:none;}
 .page::-webkit-scrollbar{display:none;}
 .tabbar{
   position:absolute;left:0;right:0;bottom:0;height:76px;z-index:50;
@@ -74,7 +74,7 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .btn-primary{width:100%;border:none;border-radius:16px;padding:16px;font-size:17px;font-weight:800;background:var(--green);color:#fff;cursor:pointer;font-family:inherit;}
 .btn-ghost{border:1.5px solid #dcd9d0;background:var(--card2);border-radius:14px;padding:12px 16px;font-size:14.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit;}
 /* 子页面 */
-.subpage{position:absolute;inset:0;background:var(--bg);z-index:60;overflow-y:auto;padding:12px 18px 110px;display:none;}
+.subpage{position:absolute;inset:0;background:var(--bg);z-index:60;overflow-y:auto;padding:calc(12px + env(safe-area-inset-top,0px)) 18px 110px;display:none;}
 .subpage::-webkit-scrollbar{display:none;}
 .subpage.show{display:block;animation:slidein .25s ease;}
 @keyframes slidein{from{transform:translateX(70px);opacity:.4;}to{transform:none;opacity:1;}}
@@ -431,7 +431,7 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .ycal{width:100%;border-collapse:separate;border-spacing:6px;text-align:center;font-size:14px;font-weight:800;}
 .ycal th{color:var(--muted);font-size:12px;font-weight:800;padding-bottom:4px;}
 .yrday{width:36px;height:36px;border-radius:50%;color:#b8bdb8;background:transparent;line-height:36px;}
-.yrday.on{background:var(--green);color:#fff;}
+.yrday.on{background:var(--green);color:#fff;cursor:pointer;}
 .ydot{width:10px;height:10px;border-radius:50%;background:#d8d5cc;}
 .ydot.on{background:var(--green);}
 .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
@@ -857,28 +857,32 @@ function openDouyin(name){
   const kw=encodeURIComponent(name);
   const web='https://www.douyin.com/search/'+kw;
   toast('正在打开抖音搜索「'+name+'」');
-  if(/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)){
+  const ua=navigator.userAgent;
+  if(!/Android|iPhone|iPad|Mobile/i.test(ua)){ window.open(web,'_blank'); return; }
+
+  // iOS：直接跳转 scheme，页面隐藏时取消 fallback，避免返回后误进浏览器
+  if(/iPhone|iPad/i.test(ua)){
     const schemes=[
       'snssdk1128://search?keyword='+kw,
-      'snssdk1128://search/tabs?keyword='+kw,
-      'snssdk1128://search/trending?keyword='+kw
+      'snssdk1128://search/tabs?keyword='+kw
     ];
-    let i=0;
-    function tryScheme(){
-      if(i>=schemes.length){ window.location.href=web; return; }
-      const ifr=document.createElement('iframe');
-      ifr.style.display='none';
-      ifr.src=schemes[i++];
-      document.body.appendChild(ifr);
-      setTimeout(function(){
-        try{ document.body.removeChild(ifr); }catch(e){}
-        if(document.visibilityState==='visible'){ tryScheme(); }
-      },900);
+    let idx=0, fallback=true;
+    function tryNext(){
+      if(idx>=schemes.length || !fallback){ if(fallback) window.location.href=web; return; }
+      const t=setTimeout(function(){ if(fallback){ idx++; tryNext(); } },900);
+      const onHide=function(){ fallback=false; clearTimeout(t); };
+      window.addEventListener('pagehide',onHide,{once:true});
+      window.location.href=schemes[idx];
     }
-    tryScheme();
-  }else{
-    window.open(web,'_blank');
+    tryNext();
+    return;
   }
+
+  // Android：优先用 Intent URL，超时回退网页
+  const intent='intent://search?keyword='+kw+'#Intent;scheme=snssdk1128;package=com.ss.android.ugc.aweme;end;';
+  const t=setTimeout(function(){ window.location.href=web; },1500);
+  window.addEventListener('pagehide',function(){ clearTimeout(t); },{once:true});
+  window.location.href=intent;
 }
 
 /* ================= 动作库数据 ================= */
@@ -2630,6 +2634,7 @@ function swimPerLabel(base, off){
   if(n===1) return dir+base;
   return dir+n+base;
 }
+function fmtSwimBar(v){ if(!v) return ''; if(v>=1000){ const k=(Math.round(v/100)/10).toFixed(1).replace(/\.0$/,''); return k+'k'; } return String(Math.round(v)); }
 
 function swimOf(){ if(!state.swim) state.swim={connected:false,hist:[]}; return state.swim; }
 
@@ -2791,7 +2796,7 @@ function renderSwim(){
   mx=Math.max.apply(null,bars.map(function(d){return d.v;}).concat([1]));
   document.getElementById('swimBars').innerHTML=bars.map(function(d){
     const h=Math.max(4,Math.round(d.v/mx*78));
-    return '<div class="sbar"><span class="bv">'+(d.v||'')+'</span><i style="height:'+h+'px"></i><span class="bl">'+d.l+'</span></div>';
+    return '<div class="sbar"><span class="bv">'+fmtSwimBar(d.v)+'</span><i style="height:'+h+'px"></i><span class="bl">'+d.l+'</span></div>';
   }).join('');
 
   const last=S.hist.length?S.hist[S.hist.length-1]:null;
@@ -2976,12 +2981,12 @@ function delSwim(){
   toast('已删除记录');
 }
 /* ================= 主页训练记录 ================= */
-function openTodayRecord(){
-  const today=new Date().toISOString().slice(0,10);
-  const recs=(state.woHist||[]).filter(function(r){ return r.d===today; });
-  let html='<h3>今日训练记录</h3>';
+function openDateRecord(dateStr, title){
+  const recs=(state.woHist||[]).filter(function(r){ return r.d===dateStr; });
+  const label=(title||dateStr);
+  let html='<h3>'+label+'</h3>';
   if(!recs.length){
-    html+='<div style="text-align:center;padding:30px 0;"><div style="font-size:42px;margin-bottom:10px;">🏋️</div><p style="font-size:14px;font-weight:800;color:var(--muted);">今日尚未有训练记录，快开始操练吧！</p></div>';
+    html+='<div style="text-align:center;padding:30px 0;"><div style="font-size:42px;margin-bottom:10px;">🏋️</div><p style="font-size:14px;font-weight:800;color:var(--muted);">该日尚未有训练记录</p></div>';
   } else {
     let totalSets=0,totalVol=0,totalMins=0;
     recs.forEach(function(r){
@@ -2990,7 +2995,7 @@ function openTodayRecord(){
       });
       totalMins+=r.mins||0;
     });
-    html+='<p class="note" style="margin-bottom:12px;">今日已完成 '+recs.length+' 次训练</p>'
+    html+='<p class="note" style="margin-bottom:12px;">当日已完成 '+recs.length+' 次训练</p>'
       +'<div class="swimdetail" style="margin-bottom:16px;">'
       +'<div class="sd"><p class="v">'+totalSets+'</p><p class="u">完成组数</p></div>'
       +'<div class="sd"><p class="v">'+totalMins+'</p><p class="u">训练分钟</p></div>'
@@ -3003,6 +3008,11 @@ function openTodayRecord(){
   }
   html+='<button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">关闭</button>';
   openModal(html);
+}
+function openTodayRecord(){ openDateRecord(new Date().toISOString().slice(0,10),'今日训练记录'); }
+function openDayRecord(y,m,d){
+  const ds=String(d).padStart(2,'0'), ms=String(m+1).padStart(2,'0');
+  openDateRecord(y+'-'+ms+'-'+ds, y+'年'+ms+'月'+ds+'日 训练记录');
 }
 
 let YEAR_VIEW=new Date();
@@ -3026,8 +3036,10 @@ function renderYearRecord(){
   let grid='';
   days.forEach(function(d,idx){
     if(idx%7===0) grid+='<tr>';
-    const cls=d && setDays.has(parseInt(d,10))?'yrday on':'yrday';
-    grid+='<td class="'+cls+'">'+(d||'')+'</td>';
+    const has=d && setDays.has(parseInt(d,10));
+    const cls=has?'yrday on':'yrday';
+    const click=has?' onclick="openDayRecord('+y+','+m+','+parseInt(d,10)+')"':'';
+    grid+='<td class="'+cls+'"'+click+'>'+(d||'')+'</td>';
     if(idx%7===6) grid+='</tr>';
   });
   if(days.length%7!==0) grid+='</tr>';
