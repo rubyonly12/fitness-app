@@ -838,8 +838,7 @@ function hideSub(id){
 }
 
 /* ================= 时间 ================= */
-function tick(){ const d=new Date();
-  document.getElementById('clock').textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function tick(){ const d=new Date(); const c=document.getElementById('clock'); if(c) c.textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 tick(); setInterval(tick,15000);
 
 /* ================= Toast ================= */
