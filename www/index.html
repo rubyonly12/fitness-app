@@ -503,6 +503,7 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .aiitem .del{width:34px;height:34px;flex:none;border:none;border-radius:10px;background:#f3e3dd;color:#c0563f;font-weight:900;cursor:pointer;}
 .note{font-size:12.5px;font-weight:700;color:var(--muted);line-height:1.6;}
 </style>
+<script src="cordova.js"></script>
 </head>
 <body data-page-node-id="kIugv3JXWEFzDeShPefj06">
 <div class="phone" data-page-node-id="RwRu53P1HKdTBZEgQVRYHw">
@@ -2419,10 +2420,95 @@ function renderHealth(){
     return '<i style="height:'+Math.max(4,v/maxW*88)+'px;'+(on?'background:#4ab8d8;':'')+'"></i>';
   }).join('');
 }
+/* ================= Apple Health（原生 HealthKit，经 cordova-plugin-health） ================= */
+function hkAvail(){
+  return !!(window.cordova && window.cordova.plugins && window.cordova.plugins.health);
+}
+function syncAppleHealth(){
+  if(!hkAvail()){ openHealthSync(); return; }
+  var h = window.cordova.plugins.health;
+  toast('正在连接 Apple Health…');
+  h.requestAuthorization({
+    read:['steps','appleExerciseTime','heart_rate','heart_rate.resting','sleep']
+  }, function(){
+    hkQueryAll(h);
+  }, function(err){
+    console.warn('HK auth error', err);
+    toast('无法获取健康权限，请手动录入');
+    openHealthSync();
+  });
+}
+function hkQueryAll(h){
+  var H = state.health;
+  var now = new Date();
+  var t0 = new Date(); t0.setHours(0,0,0,0);
+  var week0 = new Date(now.getTime()-6*24*3600*1000); week0.setHours(0,0,0,0);
+  var done = 0, TOTAL = 7;
+  function part(){ done++; if(done>=TOTAL) finishHK(); }
+  function finishHK(){
+    H.connected = true;
+    H.stepsWeek[(new Date().getDay()+6)%7]=H.steps;
+    H.sleepWeek[(new Date().getDay()+6)%7]=Math.round((H.sleepH||0)*10)/10;
+    save(); renderHealth();
+    toast('Apple Health 已连接 ✅ 数据已同步');
+  }
+  // 1 今日步数
+  h.queryAggregated({startDate:t0, endDate:now, dataType:'steps'}, function(d){
+    if(d && d.length){ H.steps = Math.round(d.reduce(function(a,x){return a+(x.value||0);},0)); }
+    part();
+  }, function(e){ console.warn('hk steps',e); part(); });
+  // 2 今日锻炼分钟
+  h.queryAggregated({startDate:t0, endDate:now, dataType:'appleExerciseTime'}, function(d){
+    if(d && d.length){ H.exerciseMin = Math.round(d.reduce(function(a,x){return a+(x.value||0);},0)); }
+    part();
+  }, function(e){ console.warn('hk exercise',e); part(); });
+  // 3 今日站立小时（尽力而为，失败保持原值）
+  try{
+    h.queryAggregated({startDate:t0, endDate:now, dataType:'appleStandHours'}, function(d){
+      if(d && d.length){ H.standH = Math.round(d.reduce(function(a,x){return a+(x.value||0);},0)); }
+      part();
+    }, function(e){ console.warn('hk stand',e); part(); });
+  }catch(e){ part(); }
+  // 4 静息心率（最近一条）
+  h.query({startDate:week0, endDate:now, dataType:'heart_rate.resting', ascending:false, limit:1}, function(d){
+    if(d && d.length && d[0].value){ H.hr = Math.round(d[0].value); }
+    part();
+  }, function(e){ console.warn('hk rhr',e); part(); });
+  // 5 血氧（最近一条，0~1 转百分比，尽力而为）
+  try{
+    h.query({startDate:week0, endDate:now, dataType:'oxygenSaturation', ascending:false, limit:1}, function(d){
+      if(d && d.length && d[0].value){ var v=d[0].value; if(v<=1) v=v*100; H.spo2 = Math.round(v); }
+      part();
+    }, function(e){ console.warn('hk spo2',e); part(); });
+  }catch(e){ part(); }
+  // 6 睡眠（过去 24 小时，累计非清醒时长）
+  h.query({startDate:new Date(now.getTime()-24*3600*1000), endDate:now, dataType:'sleep'}, function(d){
+    var ms=0;
+    (d||[]).forEach(function(x){
+      if(x.value && String(x.value).indexOf('sleep.awake')===0) return;
+      ms += (new Date(x.endDate) - new Date(x.startDate));
+    });
+    if(ms>0) H.sleepH = Math.round(ms/3600000*10)/10;
+    part();
+  }, function(e){ console.warn('hk sleep',e); part(); });
+  // 7 近 7 天步数（周柱状图）
+  h.queryAggregated({startDate:week0, endDate:now, dataType:'steps', bucket:'day'}, function(d){
+    if(d && d.length){
+      var arr=[0,0,0,0,0,0,0];
+      d.forEach(function(x){
+        var day=(new Date(x.startDate).getDay()+6)%7;
+        arr[day]=Math.round(x.value||0);
+      });
+      H.stepsWeek=arr;
+    }
+    part();
+  }, function(e){ console.warn('hk stepswk',e); part(); });
+}
 function openHealthSync(){
+  if(hkAvail()){ syncAppleHealth(); return; }
   const H=state.health;
   openModal('<h3>❤️ 连接 Apple Health</h3>'
-    + '<p class="note" style="margin-bottom:14px;">说明：iPhone 的健康数据（HealthKit）只有原生 App 能直接读取，网页版无法自动同步。你可以在此手动录入 / 定期导入数据，发布为原生 App 后即可全自动同步。</p>'
+    + '<p class="note" style="margin-bottom:14px;">说明：当前运行在网页环境中，无法直接读取 iPhone 健康数据（HealthKit），可在此手动录入 / 定期导入。在「锻炼」原生 App 中点击连接，即可自动同步步数、锻炼、心率、睡眠等数据。</p>'
     + '<div class="mrow">'
     + '<div class="mfield"><label>今日步数</label><input id="hSteps" type="number" value="'+H.steps+'"></div>'
     + '<div class="mfield"><label>锻炼（分钟）</label><input id="hEx" type="number" value="'+H.exerciseMin+'"></div></div>'

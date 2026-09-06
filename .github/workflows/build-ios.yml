@@ -116,6 +116,7 @@ jobs:
                       bs["DEVELOPMENT_TEAM"] = TEAM
                       bs["CODE_SIGN_IDENTITY"] = SIGN
                       bs["PROVISIONING_PROFILE_SPECIFIER"] = PROFILE
+                      bs["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements"
                   else:
                       bs["CODE_SIGN_STYLE"] = "Automatic"
                       bs["DEVELOPMENT_TEAM"] = TEAM
