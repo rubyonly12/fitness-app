@@ -50,7 +50,6 @@ body{
   body{padding:0;}
   .phone{max-width:none;height:100vh;height:100dvh;border-radius:0;box-shadow:none;}
 }
-.statusbar{height:40px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:15px;font-weight:700;background:var(--bg);z-index:70;position:relative;}
 #pages{flex:1;overflow:hidden;position:relative;}
 .page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:6px 18px 110px;display:none;scrollbar-width:none;}
 .page::-webkit-scrollbar{display:none;}
@@ -224,12 +223,18 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .swimtabs{display:flex;gap:6px;margin-bottom:14px;}
 .swimtabs button{flex:1;background:var(--card2);border:1.5px solid #e3e0d7;border-radius:12px;padding:9px 0;font-size:14px;font-weight:800;color:#8b938b;cursor:pointer;font-family:inherit;}
 .swimtabs button.on{background:var(--green-soft);border-color:var(--green-soft);color:var(--green);}
+.swimnav{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.swimnav button{flex:none;width:34px;height:34px;border-radius:50%;background:var(--card2);border:1.5px solid #e3e0d7;color:var(--ink);font-size:18px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+.swimnav button:active{transform:scale(.94);}
+.swimnav p{flex:1;text-align:center;font-size:14px;font-weight:900;color:var(--ink);margin:0;}
 .swimstats{display:flex;gap:10px;margin-bottom:14px;}
 .swimstat{flex:1;background:var(--green-softer);border-radius:14px;padding:12px 0;text-align:center;}
 .swimstat .v{font-size:21px;font-weight:900;color:var(--green);}
 .swimstat .u{font-size:11.5px;font-weight:800;color:#7a827a;margin-top:2px;}
-.swimbars{display:flex;justify-content:space-between;align-items:flex-end;gap:6px;height:110px;padding:0 2px;}
-.sbar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px;}
+.swimbars{display:flex;justify-content:space-between;align-items:flex-end;gap:6px;height:110px;padding:0 2px 4px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}
+.swimbars::-webkit-scrollbar{height:5px;}
+.swimbars::-webkit-scrollbar-thumb{background:var(--teal);border-radius:3px;opacity:.5;}
+.sbar{flex:0 0 30px;width:30px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px;}
 .sbar .bv{font-size:9.5px;font-weight:800;color:#6d766e;min-height:12px;}
 .sbar i{width:70%;max-width:26px;background:var(--teal);border-radius:6px 6px 3px 3px;opacity:.85;}
 .sbar .bl{font-size:9.5px;font-weight:800;color:#98a097;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;text-align:center;}
@@ -533,11 +538,6 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 </head>
 <body data-page-node-id="kIugv3JXWEFzDeShPefj06">
 <div class="phone" data-page-node-id="RwRu53P1HKdTBZEgQVRYHw">
-  <div class="statusbar" data-page-node-id="aAXcnWD09dhIXi2LOHYEpk">
-    <span id="clock" data-page-node-id="uq4S6HcBbV8NfvnSa1HuY4">16:45</span>
-    <span data-page-node-id="JhF5QgzSR27BHpsnDJUtv3">▮▮▮ 5G <span style="color:var(--green)" data-page-node-id="2BB68CQjXyUSrjHvGOyGEW">🔋</span></span>
-  </div>
-
   <div id="pages" data-page-node-id="kKNZ9vk79juFBAtt7O6ysD">
 
     <!-- ===== 新人 ===== -->
@@ -559,135 +559,6 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
         </div>
       </div>
       <div id="dayList" data-page-node-id="9pS2fRfD8znSx4Huai1pmM"></div>
-    </div>
-
-    <!-- ===== 历史 ===== -->
-    <div class="page" id="page-history" data-page-node-id="TaeKp1yPkZPPEVAF7J24nO">
-      <h1 class="pgtitle" data-page-node-id="1G8QMGBm50RUnD4XTB2LQ5">历史</h1>
-      <p class="pgsub" data-page-node-id="glOdZeymBe4hWl0MA03wIl">热量与体重数据分析</p>
-      <div class="seg" id="histSeg" data-page-node-id="XKiZUHMKMQWOmpRTHEo4FC">
-        <button class="on" data-t="stat" data-page-node-id="EHa5bydCTuHsYTU3uZLDDJ">统计</button>
-        <button data-t="log" data-page-node-id="GsXrCNPj2TFLLZyws1o6Jh">记录</button>
-      </div>
-      <div id="histStat" data-page-node-id="nq2eFD9lfFbZ7ZLxWtAsuJ">
-        <div class="card" id="trendCard" data-page-node-id="oONC8fZFdlKd6KChrox545">
-          <p id="trendTitle" style="font-size:18.5px;font-weight:900;margin-bottom:12px;" data-page-node-id="Z5nK4FywcCBQSURzp3DlRP">本周热量趋势</p>
-          <div class="rangepill" id="rangePill" data-page-node-id="SZnDSAuLteTmSLUBUZZfSa">
-            <button class="on" data-r="week" data-page-node-id="tYFoNyh8PI3zO0L35yCNDD">1周</button>
-            <button data-r="month" data-page-node-id="0qPj63qC0tX2lAiVKpLyom">1个月</button>
-            <button data-r="year" data-page-node-id="RAtqzAx9hBrY5CBxvDwdCe">1年</button>
-          </div>
-          <div class="metchips" id="metricChips" data-page-node-id="EwT2hx79InS9E5Bbf3stT4">
-            <button class="metric on" data-m="kcal" data-page-node-id="BBjtqLcqA1goziaV6DRCQU">热量</button>
-            <button class="metric" data-m="p" data-page-node-id="CXewIvMm5zct7JFxDzeJef">蛋白质</button>
-            <button class="metric" data-m="c" data-page-node-id="nG9TA5E3Kah3XBpnWk3CkK">碳水</button>
-            <button class="metric" data-m="f" data-page-node-id="CRWBy30HsYPL6TChCbuQCx">脂肪</button>
-            <button class="metric" data-m="w" data-page-node-id="VeYj6gGDM8KNjb69Hg6Vzt">水分</button>
-          </div>
-          <p id="vsTitle" style="font-size:15px;font-weight:800;margin-bottom:8px;" data-page-node-id="sqB0jF21rgIr0BtTrGo2x9">摄入 vs 每日目标</p>
-          <div class="legend" data-page-node-id="wfBQ56hh0TXDXO0RbvxQoa">
-            <span data-page-node-id="slYH2zYGcqYID0BZ355fy7"><span class="dot" data-page-node-id="FNSFv70Vlz00QLS37tdfv3"></span>总摄入</span>
-            <span data-page-node-id="O1cDDatvDiVIrulhpCeQks"><span class="dash" data-page-node-id="lZ3C9jWaHqoP98sgOB3OFm"></span>目标 <b id="goalLegend" style="color:var(--ink)" data-page-node-id="wt089lyDKYoSCyLIRvvD1R">1423 kcal</b></span>
-          </div>
-          <div class="chartdate" id="chartDate" data-page-node-id="4hCtBgn2S28DHZodmkA300">本周：0 kcal</div>
-          <div class="chartbox" data-page-node-id="ELj6z8A8veHnDMB8DKseLN">
-            <svg id="trendSvg" viewBox="0 0 340 190" width="100%" height="100%" preserveAspectRatio="none" data-page-node-id="nAdDrZyIScPqPrN2UDTEqh"></svg>
-          </div>
-          <div class="wklabels" id="wkLabels" data-page-node-id="lTiYxGYjQoQEmdmVcfR2cD"></div>
-        </div>
-        <div class="card" data-page-node-id="CeL9QaAlwxEVAmCGng7p4a">
-          <div class="statrow" onclick="openWeight()" data-page-node-id="Hl0BKOLDxrQbm1bEFh517N">
-            <span class="ic" data-page-node-id="uLJQBKrDhK41LC387H5Sd3">⚖️</span><span class="t" data-page-node-id="BJe15GCxryI4PNcn8EfmXo">目前体重</span><span class="v" id="curWeight" data-page-node-id="NHKzDSQuXMReHl9trrQsSD">未记录</span><span style="color:#c0c4bb;font-weight:900;" data-page-node-id="a5VnA1eBFMItbQg6ueLcS9">›</span>
-          </div>
-        </div>
-        <div class="card" data-page-node-id="gLQVSJJej8korxPck5Y7No">
-          <p style="font-size:18px;font-weight:900;margin-bottom:10px;" data-page-node-id="iX2Omjy5LEdVFU3zc7xSDD">体重变化趋势</p>
-          <div class="chartbox" style="height:150px;" data-page-node-id="0mGv0iDsFrYG1dzqSV0z7h">
-            <svg id="weightSvg" viewBox="0 0 340 150" width="100%" height="100%" preserveAspectRatio="none" data-page-node-id="72j00INoSdblmzxheDu7yq"></svg>
-          </div>
-          <p class="empty-meal" id="weightTip" data-page-node-id="r8078QZEXDC0SnyibGPKM9">在「设置」中记录体重后，这里会显示变化曲线。</p>
-        </div>
-      </div>
-      <div id="histLog" style="display:none;" data-page-node-id="2KA8VLmygKTYGb2k39v0k7">
-        <div class="card" id="histLogList" data-page-node-id="e9BrIXjDisjJxbCt3HTeFD"></div>
-      </div>
-    </div>
-
-    <!-- ===== 食物分析 ===== -->
-    <div class="page" id="page-food" data-page-node-id="1yjLPYyqbV0gtft5xDItGI">
-      <h1 class="pgtitle" style="margin-top:18px;" data-page-node-id="64kk6GSbCdzL3UUFDMd1DY">食物分析</h1>
-      <div class="foodtabs" data-page-node-id="gMtmhfZLwGmBNGKo1tlyhX">
-        <button class="on" data-t="nut" data-page-node-id="J1IBpvcne4nmuWhj9mIBFn">营养摄取</button>
-        <button data-t="scan" data-page-node-id="dwCvSej0ba7OS94wjGnSSL">超市扫描</button>
-      </div>
-      <div id="foodNut" data-page-node-id="LngfhyVgoIWCWztFDW4yB2">
-        <div class="card" data-page-node-id="VL6Epsp1RIvzTsK7JCWHZk">
-          <div class="goalhead" data-page-node-id="TbNwavmSoX1qZtG5evVlES">
-            <span class="t" data-page-node-id="meGEvHCCzxBkWOphMGJtO9">每日热量目标</span>
-            <button class="recalc" onclick="openTdee()" data-page-node-id="P72ZzzwlHq80GnXVDCGyzr">重新计算</button>
-          </div>
-          <div class="bigkcal" id="goalKcal" data-page-node-id="yfyNIYvHtQwUSPE7Vy7cxS">1423</div>
-          <div class="kcalunit" data-page-node-id="1bsEF3qdFeWsDoHWqMj4Rl">大卡 / 天</div>
-        </div>
-        <div class="card" data-page-node-id="PfzvpO4OfYtVoqGSEVptkx">
-          <p class="macros" data-page-node-id="B9R113UXEBcECWwujFwqWf">今日营养摄取</p>
-          <p class="macronote" data-page-node-id="CBZDkFJrvvOwLEO8D0zr2G">依 <b data-page-node-id="6BArmEDgBIvGHqQF4ydKnt">TDEE</b> 热量估算三大营养素目标（蛋白 <b data-page-node-id="dL0yUBKSPSgcG2YNL3oW6p">35%</b>・碳水 <b data-page-node-id="W0eExj1c68hjnud5VcpGdq">25%</b>・脂肪 <b data-page-node-id="nwIgJpAZgGeIKfAWr1EJwB">40%</b>）。</p>
-          <div class="remaining" data-page-node-id="aYchA1YymMlITuhGX0pJin">
-            <div class="r1" data-page-node-id="IWqZqTHWAW3tLTBU9Cp2zs">🔥 剩余可摄入：<b id="remainKcal" data-page-node-id="QBauIb5IJcWSNeHuYtx5ih">1423</b> 大卡</div>
-            <div class="r2" data-page-node-id="SGFOiEDN6qhOOFXCwLvG8c">今日运动消耗：<span id="burnedKcal" data-page-node-id="Bp6LJJ0AoMuEfuRhUFWhKg">+0 kcal</span><span class="info" data-page-node-id="Lm27m0xIcYziSmYTZ7g1BU">i</span></div>
-          </div>
-          <div class="macrow" data-page-node-id="QYIW6NOmQ3uLdB1izq4NNd">
-            <div class="top" data-page-node-id="ILyG8XvLoWCGovg5yPxcUx"><span class="name p" data-page-node-id="o8WPLThSX6WiNm2vcGwtnA">蛋白质</span><span class="val" data-page-node-id="07lENiNc0iI7tRIn7JmWsz"><span id="pNow" data-page-node-id="Jq6jmZ6KPJozJ8XmFtmn3w">0</span>g / <span id="pGoal" data-page-node-id="W02uYttPZV4mpVrCtUhdiA">124.5</span>g</span></div>
-            <div class="left" data-page-node-id="sLRxPKjKDIx3PywUsOZ3LF">剩余：<span id="pLeft" data-page-node-id="Sr3IVS3S9JzZ6X1V6tnIlj">124.5</span>g</div>
-            <div class="bar" data-page-node-id="1ZoXYQSvKtgmdwlVsoWXsu"><i class="p" id="pBar" style="width:0%" data-page-node-id="rnKNzGdpzmcU2r5m5VrTDI"></i></div>
-          </div>
-          <div class="macrow" data-page-node-id="OHiQaqUPSRKtnCKYnidJT6">
-            <div class="top" data-page-node-id="BEUWyeYDo3Foz35ai6kX9X"><span class="name c" data-page-node-id="9gYiIB2MIvQu9Ptq5EBolB">碳水</span><span class="val" data-page-node-id="NeaFSYNX8rYF8GocobErn5"><span id="cNow" data-page-node-id="piJGCaHr7zbGpAraHsNBvE">0</span>g / <span id="cGoal" data-page-node-id="SNoHIH95UGCgrLrIeCbR6c">88.9</span>g</span></div>
-            <div class="left" data-page-node-id="ngHLdPD447GuXAGMhfwf2k">剩余：<span id="cLeft" data-page-node-id="IxMkI634DgBHGM5IafDF5H">88.9</span>g</div>
-            <div class="bar" data-page-node-id="GMXrpMJP3NY70vBmVunRcl"><i class="c" id="cBar" style="width:0%" data-page-node-id="Fg4Yk97wfiRT2MUSH628Mq"></i></div>
-          </div>
-          <div class="macrow" data-page-node-id="6IzE8LXwxlGdnT5tmOiUeO">
-            <div class="top" data-page-node-id="pSxyldohdIkiErspBTJqWQ"><span class="name f" data-page-node-id="1zoSkLOiqNRCdom1P0WECS">脂肪</span><span class="val" data-page-node-id="tdwH131YFnFPHQgOfgLSZV"><span id="fNow" data-page-node-id="jm9IR4prBtOoiSWLB7g5Bl">0</span>g / <span id="fGoal" data-page-node-id="RqnIg21GpUt6G1eVopYM5v">63.2</span>g</span></div>
-            <div class="left" data-page-node-id="TU3sbytVGBH0mQVE7z6Q8O">剩余：<span id="fLeft" data-page-node-id="JhegsRSZ0wqtZUFSYLowMB">63.2</span>g</div>
-            <div class="bar" data-page-node-id="RqhoiB4fTzqBuzVwTUWekO"><i class="f" id="fBar" style="width:0%" data-page-node-id="R1SkBykB9ThBpkECeihrDY"></i></div>
-          </div>
-          <div class="two-btn" data-page-node-id="UWBvVCyZC6gMK1M0KnOMDc">
-            <button class="btn-ghost" onclick="openAdd('food')" data-page-node-id="6QpEtiiTkYkZJBhX8hHmDd">✏️ 手动新增</button>
-            <button class="btn-ghost movebtn" onclick="openAdd('burn')" data-page-node-id="64LPCFRtnfecvNYFuHFYa1">＋ 运动消耗 · <span id="burnBtnVal" data-page-node-id="C5PKWHFFE0jIU0kifc5cmq">0</span> kcal</button>
-          </div>
-          <button class="prefbtn" onclick="openPrefs()" data-page-node-id="lhmR56qj9owHfz5Q5Gp74O">✨ 饮食偏好与限制（可设置）</button>
-          <button class="ai-btn" onclick="genMealPlan()" data-page-node-id="ipyL1G4pE8341DvqXFAqBt">✦ ✦ 生成 AI 菜单</button>
-        </div>
-        <div class="card" data-page-node-id="7Fz4Xh7KcSrzEMWJfZuwtk">
-          <div class="photohead" data-page-node-id="IPGQ4uFq7n6slxXqa0d4E2"><span class="t" data-page-node-id="MkD6e1yuTbe4p3vHPdmCf6">食物拍照</span></div>
-          <p class="photosub" data-page-node-id="uJZY07n1zp8doKJdAb7mJO">拍照后 AI 自动识别热量与营养</p>
-          <p class="photoleft" data-page-node-id="sFsAG5M4mqCWcV8BcAb363">拍照次数不限，识别结果可随时修改</p>
-          <button class="camcircle" onclick="document.getElementById('camInput').click()" data-page-node-id="WfSZzL6LqiwnO5dM9LbMps">📷</button>
-          <p class="camhint" data-page-node-id="ClKAtf8y3e7jNoB7yryzTX">点击拍照</p>
-        </div>
-        <div class="card" data-page-node-id="kG5DwWjNy25Sbu4V3gx5yE">
-          <div class="mealhead" data-page-node-id="HRWQ14GQn22Y26JMbluVCE"><span class="t" data-page-node-id="1CjFknJjvzljOQNn8dGhRH">餐点记录</span><button class="calbtn" data-page-node-id="XNIeYzer3QKoUp2lgEc9fR">🗓</button></div>
-          <p class="monthlabel" data-page-node-id="HTwDYrCsl6SZFmjRhW8OLT">跳至月份</p>
-          <button class="monthsel" onclick="openMonths()" data-page-node-id="sk09BkxbBvLsoGQBmsh8or"><span id="monthLabel" data-page-node-id="rUDr7KlMJF7CFgfho6nAA2">2026年9月</span><span data-page-node-id="o3MMapTx8PTzlsvC0j2NXo">⌄</span></button>
-          <div class="weekstrip" id="weekStrip" data-page-node-id="FUqa3cArWiQwcOLaDZz5Cv"></div>
-          <div class="mealday" data-page-node-id="khuq31aWpHgkZ4xRVxCAI4">
-            <span class="d" id="mealDate" data-page-node-id="12Q7A6OJqtA9bV8ZSyTiUI">2026-09-04</span>
-            <span class="goal" data-page-node-id="Q8YPVUdHgRflfzXAzsK8to">🎯 目标：<span id="mealGoal" data-page-node-id="BJb00yh6GJYnQ7GBumo1ly">1423</span> kcal</span>
-          </div>
-          <div id="mealList" data-page-node-id="DPeEXpfKQQebk82380eDo8"><p class="empty-meal" data-page-node-id="fS1Fz1hnc3EDl0E0k6zToT">今天还没有记录，拍照或手动添加吧 🍽</p></div>
-        </div>
-      </div>
-      <div id="foodScan" style="display:none;" data-page-node-id="xM7VvWhPw9kOCUHJuAI7ax">
-        <div class="card" data-page-node-id="igOpPWBZurScYYOzlH1HRU">
-          <p style="font-size:19px;font-weight:900;margin-bottom:4px;" data-page-node-id="1RUgeZDbkVja2po5DRLGsJ">超市扫描</p>
-          <p style="font-size:13.5px;font-weight:700;color:var(--muted);margin-bottom:12px;" data-page-node-id="ILRz0NG8p746Ap8JoVclmL">搜索或扫描食品，一键加入今日记录（次数不限）</p>
-          <div class="searchwrap" data-page-node-id="kESU4iJhH4HdIlL3Cv98qx">
-            <input class="searchbox" id="scanSearch" placeholder="输入食品名称，例如：鸡胸肉" oninput="renderFoodDb()" data-page-node-id="6Lg6O1EiSskbjU0c27HWT2">
-          </div>
-          <button class="btn-ghost" style="width:100%;margin-bottom:14px;" onclick="toast('条码扫描请在手机端调用相机使用')" data-page-node-id="uIWVzvRvkY36mTPZw5yXx4">📷 扫描条码</button>
-          <div id="foodDb" data-page-node-id="yFOt7CJC0VIEFROzGkm3ax"></div>
-        </div>
-      </div>
     </div>
 
     <!-- ===== 主页 ===== -->
@@ -732,16 +603,6 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
         </div>
       </div>
       <div style="height:12px" data-page-node-id="rG7NfA2DFLmzFmZ8AVfF6K"></div>
-      <div class="card" data-page-node-id="EIiMNRFLlQzJsEsnkmKhyq">
-        <div style="display:flex;align-items:flex-start;gap:12px;" data-page-node-id="8Sm1DLjFrFIIcgDZhzX0Bg">
-          <div style="flex:1;" data-page-node-id="OSJAlkwFY6ie4npLvxjOmh">
-            <p style="font-size:19px;font-weight:900;" data-page-node-id="uQrokNsQ4kSPQKNZaWGqUJ">食物分析</p>
-            <p style="font-size:14px;font-weight:700;color:#7a827a;margin:6px 0 12px;" data-page-node-id="7CI73oFWFCggHUdPGbA8Bi">拍照记录每一餐，次数不限</p>
-            <button class="btn-ghost" style="display:inline-flex;align-items:center;gap:6px;" onclick="document.getElementById('camInput').click()" data-page-node-id="MHqc26CpgXDNs6ZWbk2CeP">📷 相机扫描</button>
-          </div>
-          <span style="width:52px;height:52px;border-radius:14px;background:var(--green-softer);display:flex;align-items:center;justify-content:center;font-size:22px;" data-page-node-id="ao6eZun8NOWDyEiZ75agTD">🍴</span>
-        </div>
-      </div>
       <div class="card" style="margin-bottom:0;" data-page-node-id="Kyi4mxobj1eRrk3Fd5sqC7">
         <div style="display:flex;align-items:center;gap:12px;" data-page-node-id="edOS8fdGZlPR6uF8KjqTGY">
           <span class="ic" style="width:42px;height:42px;border-radius:12px;background:var(--green-softer);display:flex;align-items:center;justify-content:center;font-size:19px;" data-page-node-id="vcC6cesQgbnrJLnWapy4y0">⚖️</span>
@@ -752,77 +613,7 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
           <span style="font-size:16px;font-weight:900;color:#3c453e;" id="homeWeight" data-page-node-id="ed03Kh3YfQNXT4hZRDvjPS">--</span>
         </div>
         <div style="display:flex;gap:10px;margin-top:14px;" data-page-node-id="GGnglia7CYrTd9buHwnI7O">
-          <button class="btn-ghost" style="flex:1;" onclick="openWeight()" data-page-node-id="9EXz25k7p7NdWGxxlyx5z3">记录</button>
-          <button class="btn-ghost" style="flex:1;" onclick="switchTab('history')" data-page-node-id="La6g2L5ekKPBP3gdwyaO1P">历史</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== 健康 ===== -->
-    <div class="page" id="page-health" data-page-node-id="7Py1WiyiO3kLQGNjvRF8dO">
-      <h1 class="pgtitle" data-page-node-id="rCAKRNqLX64Lfr1ciymlWT">健康</h1>
-      <p class="pgsub" data-page-node-id="ynAjlJj79eiiD9vXuDPq5t">来自 Apple 健康的数据总览</p>
-      <div class="card" style="text-align:center;" data-page-node-id="HD6zTPLAYDs4dgtm7TmgDU">
-        <p style="font-size:17px;font-weight:900;" data-page-node-id="WU8r5ywQCHhWe3zO6Ctf4a">❤️ Apple 健康</p>
-        <p class="note" style="margin:8px 0 14px;" id="healthConn" data-page-node-id="J09mxZ2RK4dUCR0BGkE0ss">未连接 · 数据需手动录入或导入</p>
-        <button class="btn-primary" onclick="openHealthSync()" data-page-node-id="PIxmr2KGtbzzAc6ugDB0sq">连接 Apple Health</button>
-      </div>
-      <div class="card" data-page-node-id="VknqEoWhjWf7DNlCdNrgU2">
-        <p style="font-size:17px;font-weight:900;margin-bottom:14px;" data-page-node-id="IGm8vCOeJHpCO6H1aKA4lk">今日活动</p>
-        <div class="ringrow" data-page-node-id="De9H7Y4gXH4JCx4XRNCh5J">
-          <svg width="140" height="140" viewBox="0 0 150 150" data-page-node-id="iXtZCYIky6sKaBJWsewWrP">
-            <circle cx="75" cy="75" r="62" fill="none" stroke="#e6e3da" stroke-width="12" data-page-node-id="2bCIPLH6vfECN8Q01xluPp"/>
-            <circle cx="75" cy="75" r="48" fill="none" stroke="#e6e3da" stroke-width="12" data-page-node-id="UxsQY5TAKoCGnFGqPb9hpn"/>
-            <circle cx="75" cy="75" r="34" fill="none" stroke="#e6e3da" stroke-width="12" data-page-node-id="3gTWLsZf5DaqDlvhbFdSvF"/>
-            <circle id="ring1" cx="75" cy="75" r="62" fill="none" stroke="#f26b5b" stroke-width="12" stroke-linecap="round" transform="rotate(-90 75 75)" data-page-node-id="RVpFxrf3wyKFfvaHFPFUs8"/>
-            <circle id="ring2" cx="75" cy="75" r="48" fill="none" stroke="#7cc36a" stroke-width="12" stroke-linecap="round" transform="rotate(-90 75 75)" data-page-node-id="iJewWmep6BeBzYTZPorY24"/>
-            <circle id="ring3" cx="75" cy="75" r="34" fill="none" stroke="#4ab8d8" stroke-width="12" stroke-linecap="round" transform="rotate(-90 75 75)" data-page-node-id="ze3mSOpWDBeJoNF0PedldS"/>
-          </svg>
-          <div class="ringleg" data-page-node-id="CFzM7KJdop0sXtMfbVxRZv">
-            <div data-page-node-id="TeNsNpJiknmo6tHk5AJEjq"><i style="background:#f26b5b" data-page-node-id="z8nT1sl6q8bcxM8hQhBtIv"></i>活动 <b id="hlBurn" data-page-node-id="5kwH7pIkgcf5cUn9zGofno">0</b>/500 kcal</div>
-            <div data-page-node-id="qnzN85mEV6pHvd55P1WZ8z"><i style="background:#7cc36a" data-page-node-id="r4yFDiVW3EG2GnLrYlX85W"></i>锻炼 <b id="hlEx" data-page-node-id="2MEDBmn2xiFdAhVyOkINoQ">0</b>/30 分钟</div>
-            <div data-page-node-id="cgsBWOE4WvUJl28h1f4386"><i style="background:#4ab8d8" data-page-node-id="FmoepxrUDH6cvwswEzj7gW"></i>站立 <b id="hlStand" data-page-node-id="hyzuVCiSXAqJud6IgJ90ew">0</b>/12 小时</div>
-          </div>
-        </div>
-      </div>
-      <div class="card" data-page-node-id="b8Fa0K51r5WRnZ33I9bvxj">
-        <p style="font-size:13px;font-weight:800;color:var(--muted);" data-page-node-id="c31auGF2Mp4jkRNeMSWACX">今日步数</p>
-        <div style="display:flex;align-items:baseline;gap:6px;margin:4px 0 2px;" data-page-node-id="pGuEUkPME5Bd7jmbO9Ivw0">
-          <span class="bignum" id="hlSteps" data-page-node-id="7VwVdzhK12PzcDdXYaF6y4">0</span><span class="bigunit" data-page-node-id="GiQDUS6kUYLWXaeiARsjqG">步</span>
-        </div>
-        <div class="hbar" id="stepsBar" data-page-node-id="xYVgPiQxgxBNC5cR4uBpTs"></div>
-        <div class="hbarlabels" data-page-node-id="AbjUGayU0NMfhFerF1tVyn"><span data-page-node-id="UNDoIpMRD9BwZ2rFs72kqT">一</span><span data-page-node-id="a032zCbT5nKKqdZEA20idJ">二</span><span data-page-node-id="M9VB75oGdARMPhcBBf3Z8g">三</span><span data-page-node-id="QIOvd4llcSThL6tDE0UWp0">四</span><span data-page-node-id="LdakVEI3E4hzAtTQJzN0YB">五</span><span data-page-node-id="RaEvApENeewwNIM1pKd4DZ">六</span><span data-page-node-id="nMWsbO1AncsVAjdNLJ50HO">日</span></div>
-      </div>
-      <div class="homerow" data-page-node-id="ZEkStwP1Alvk1njHi7CZCa">
-        <div class="hcard2" data-page-node-id="pGbLaqTOyTdDpoGaAip9Z8"><p class="t" data-page-node-id="wjsE0kL441OYHCOsbglEa5">❤️ 静息心率</p><p class="v" id="hlHr" data-page-node-id="ELfRbJs9NTaf3gZxvfUiwC">--</p><p class="u" data-page-node-id="Om3Hu0361RvhIOBbOP238A">bpm</p></div>
-        <div class="hcard2" data-page-node-id="ixrimuyNxYnbVt2d6uzkrk"><p class="t" data-page-node-id="klyV59FuqCscgrKLAch7ml">🫁 血氧</p><p class="v" id="hlSpo2" data-page-node-id="TpmL07RbYT3zEqPHbl6sDR">--</p><p class="u" data-page-node-id="o7TCuqmljquYQFE32aY5di">%</p></div>
-      </div>
-      <div style="height:12px" data-page-node-id="iSeiWHq0ivrMgj9P9TCQyQ"></div>
-      <div class="card" data-page-node-id="WR5HGlVLP7XdF1mZBFCwHq">
-        <p style="font-size:13px;font-weight:800;color:var(--muted);" data-page-node-id="QRJG1gg3WftJxVzMRCXs47">昨晚睡眠</p>
-        <div style="display:flex;align-items:baseline;gap:6px;margin:4px 0 2px;" data-page-node-id="2Y3ICB4Hrf3DgWF1AzAtaP">
-          <span class="bignum" id="hlSleep" data-page-node-id="zvC47p4zpkU2P8bjGf4A5U">--</span><span class="bigunit" data-page-node-id="1r25qsFnIDLi6MHxp97cTX">小时</span>
-        </div>
-        <div class="hbar" id="sleepBar" data-page-node-id="vmohk2Nj14tsMK1gRfoHAS"></div>
-        <div class="hbarlabels" data-page-node-id="Mt1QoXuHDR54awirVFQYHl"><span data-page-node-id="PgOvwmnxSeWqmjxDhKo52w">一</span><span data-page-node-id="5S63ADKQldl9Xfj1PYm6mY">二</span><span data-page-node-id="BinUtGG6J993LyMEinNoLL">三</span><span data-page-node-id="9RZZjOONpLH9NbqXO6OHOW">四</span><span data-page-node-id="vrkMCgTFukzAdIqZ1GGcVH">五</span><span data-page-node-id="Aez8VrhjnE0zxBuuTgMaRm">六</span><span data-page-node-id="fZGYECuBlluzK0Q1paYRBA">日</span></div>
-      </div>
-      <div class="homerow" data-page-node-id="MFUoGpWin6qBr5vPXjUjeB">
-        <div class="hcard2" style="cursor:pointer;" onclick="openWeight()" data-page-node-id="7ZWZvMUSav4zB3KHdpZ1WP"><p class="t" data-page-node-id="tWwHgCGlg4KSHANA5VyuGm">⚖️ 体重</p><p class="v" id="hlWeight" data-page-node-id="HIVf8OyEVadkIbJgn8Mmwh">--</p><p class="u" data-page-node-id="fzqptRk6yg6uZNEP1Xg3VO">kg · 点击记录</p></div>
-        <div class="hcard2" data-page-node-id="ChwC5RfD1cwZBjqIEdH2Zu"><p class="t" data-page-node-id="RKfDnC5nBrguDUAPII14Vx">🔥 活动热量</p><p class="v" id="hlBurn2" data-page-node-id="NTIKMKCqs7HTxv8Mtjsom0">0</p><p class="u" data-page-node-id="3hkAOtUgXqp53DkcvIy9sM">kcal</p></div>
-      </div>
-      <div style="height:12px" data-page-node-id="hTg3DXSOtnsSzEj0L0sHl5"></div>
-      <div class="card" style="margin-bottom:0;" data-page-node-id="P9esPfC47BBMP68uRUMDDv">
-        <div style="display:flex;align-items:flex-start;gap:12px;" data-page-node-id="Q5WIeCVEBzhwHFOLS4d3EY">
-          <span style="width:42px;height:42px;flex:none;border-radius:12px;background:var(--green-softer);display:flex;align-items:center;justify-content:center;font-size:19px;" data-page-node-id="WEWQNFvRQUfYhmJc2WOQZC">💧</span>
-          <div style="flex:1" data-page-node-id="RlJ31jz91LVUeISV44pwBx">
-            <p style="font-size:16px;font-weight:900;" data-page-node-id="Oho2Dkd1Uc35PLMV41xwJp">饮水记录</p>
-            <p class="waterv" data-page-node-id="N2MdU4uX2y58DT3CKJ97po"><b id="waterMl" data-page-node-id="a9JJyLHInMaACYQioxK1Sw">0</b> / <span id="waterGoalTxt" data-page-node-id="fp7mUMalKkD379mHQauKiD">2000</span> ml</p>
-            <div class="waterbtns" data-page-node-id="e4klAVHCeFaHHJy7SuZ77y">
-              <button onclick="addWater(150)" data-page-node-id="Ik980gkcw5BDyuA3c21iYJ">+150</button>
-              <button onclick="addWater(300)" data-page-node-id="LXg1yef95w4q7KrXUgA2Jo">+300</button>
-              <button onclick="addWater(500)" data-page-node-id="BfNVfLEwCHblldEi9p2e2t">+500</button>
-            </div>
-          </div>
+          <button class="btn-ghost" style="width:100%;" onclick="openWeight()" data-page-node-id="9EXz25k7p7NdWGxxlyx5z3">记录</button>
         </div>
       </div>
     </div>
@@ -852,7 +643,11 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
         <div class="swimstat"><p class="v" id="swimKcal">0</p><p class="u" id="swimKcalU">消耗 (kcal)</p></div>
       </div>
       <div class="card" style="margin-bottom:14px;">
-        <p style="font-size:13px;font-weight:800;color:var(--muted);margin-bottom:8px;" id="swimRange">本周</p>
+        <div class="swimnav">
+          <button onclick="changeSwimOffset(1)" aria-label="上一时段">‹</button>
+          <p id="swimRange">本周</p>
+          <button onclick="changeSwimOffset(-1)" aria-label="下一时段">›</button>
+        </div>
         <div class="swimbars" id="swimBars"></div>
       </div>
       <div class="card" style="margin-bottom:14px;display:none;" id="swimLastCard">
@@ -967,14 +762,6 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
       <svg viewBox="0 0 24 24" data-page-node-id="tXrDQljXNHPRlXPe1GZ7Gk"><path d="M12 4 3 8.5 12 13l9-4.5L12 4z" data-page-node-id="q7o8egk4EfjLC7yagfwqfH"/><path d="M6.5 10.5V15c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-4.5" data-page-node-id="Zg0w8Fuvbqa3ELzOMVcTo9"/><path d="M21 8.5V14" data-page-node-id="pYUIA5o56pShdtlrbPCmOO"/></svg>
       <span data-page-node-id="zS3aBt8KHIUvUpzC43bpwC">训练</span>
     </button>
-    <button class="tab" data-p="history" data-page-node-id="MzFXTQUax2V67EoeyHOzHa">
-      <svg viewBox="0 0 24 24" data-page-node-id="0z1KYAVT2CsnwmmoJg5U8g"><rect x="4" y="5" width="16" height="15" rx="2" data-page-node-id="PS5HapOI27y1GFqPlwcm6T"/><path d="M4 9.5h16M8 3v4M16 3v4" data-page-node-id="NBdCSHYYqjTwNCyY7Ge80w"/></svg>
-      <span data-page-node-id="gjwZCRYfThubNut559R3WQ">历史</span>
-    </button>
-    <button class="tab" data-p="food" data-page-node-id="lK5BmW1X5FqDnjMWahwsao">
-      <svg viewBox="0 0 24 24" data-page-node-id="UBd4braHc7nvkFKD1uQy56"><path d="M5 3v7M8 3v7M6.5 3v18M6.5 10a1.5 1.5 0 0 0 1.5-1.5V3" data-page-node-id="5tj3FRwTsh8ulxfmx2ORZR"/><path d="M16.5 3c-1.8 1.5-2.5 4-2.5 7 0 2 1 3 2.5 3v8" data-page-node-id="IeCVSHSTJWx7BR4n022uFL"/><path d="M16.5 3c1.8 1.5 2.5 4 2.5 7 0 2-1 3-2.5 3" data-page-node-id="kKC32mM0K6l6ZCzy0R2S54"/></svg>
-      <span data-page-node-id="v4rRDrdGB4vVjMgQW1iqLC">食物分析</span>
-    </button>
     <button class="tab" data-p="home" data-page-node-id="Pu1CJ19hDfJlVCsUjpoCNf">
       <svg viewBox="0 0 24 24" data-page-node-id="qJFXkdDtp9FJrEFfYuHEhM"><path d="M4 11 12 4l8 7" data-page-node-id="2COEstpek9CIDUoCOVoCzW"/><path d="M6 10v10h12V10" data-page-node-id="IC4BZYzsCwKtqPNDp6zFOy"/></svg>
       <span data-page-node-id="wMJ9vtFpjTxaxSSHzDTiWd">主页</span>
@@ -982,10 +769,6 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
     <button class="tab" data-p="coach" data-page-node-id="QtWMy40XyF6OBcGzO8AvB5">
       <svg viewBox="0 0 24 24" data-page-node-id="hUaUZajfdaJ3teyMyFu3ly"><path d="M3 16c2 0 2.5-1.5 4.5-1.5S10 16 12 16s2.5-1.5 4.5-1.5S19 16 21 16" /><path d="M3 20c2 0 2.5-1.5 4.5-1.5S10 20 12 20s2.5-1.5 4.5-1.5S19 20 21 20"/><circle cx="15" cy="7" r="2.2"/><path d="M6 13c1-3 3.5-5 6.5-5l2.5 2 3 1"/></svg>
       <span data-page-node-id="NHTkTbtwiIJ4DAk51FZoTU">游泳</span>
-    </button>
-    <button class="tab" data-p="health" data-page-node-id="ISLvKCFZhqQyxYopYLK6og">
-      <svg viewBox="0 0 24 24" data-page-node-id="TsA47J4TPwKfD8E6tLjw47"><path d="M12 20s-7-4.5-9-9c-1.2-2.8.4-6 3.5-6.5C8.5 4.2 10.5 5.5 12 7.5 13.5 5.5 15.5 4.2 17.5 4.5 20.6 5 22.2 8.2 21 11c-2 4.5-9 9-9 9z" data-page-node-id="O9t1MQ7GaPoPk4z5SMZ8rf"/></svg>
-      <span data-page-node-id="PYfxfxVrrNIIC8s9gF8yLW">健康</span>
     </button>
     <button class="tab" data-p="settings" data-page-node-id="edi6rmGuYBKUxC6UXgOhbp">
       <svg viewBox="0 0 24 24" data-page-node-id="gSpGfzxrHeIDO7QL2qNJRU"><circle cx="12" cy="12" r="3" data-page-node-id="iExD4RbJLf3VVXWH8lD79F"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" data-page-node-id="aE1axDVyaJAZymNATO534h"/></svg>
@@ -1045,13 +828,11 @@ function switchTab(name){
 function showSub(id){
   document.getElementById(id).classList.add('show');
   document.getElementById(id).scrollTop=0;
-  document.querySelector('.statusbar').style.display='none';
   document.getElementById('planFab').style.display = (id==='sub-plans')?'block':'none';
   document.getElementById('selFab').style.display = (id==='sub-lib' && libMode==='plan')?'block':'none';
 }
 function hideSub(id){
   document.getElementById(id).classList.remove('show');
-  document.querySelector('.statusbar').style.display='';
   document.getElementById('planFab').style.display='none';
   document.getElementById('selFab').style.display='none';
 }
@@ -2033,7 +1814,9 @@ function dataOf(){
   return src.map(function(v){ return Math.round(v*r); });
 }
 function renderTrend(){
-  const svg=document.getElementById('trendSvg'), W=340,H=190,baseY=H-34,pad=14;
+  const svg=document.getElementById('trendSvg');
+  if(!svg) return;
+  const W=340,H=190,baseY=H-34,pad=14;
   const data=dataOf(), target=targetOf(), unit=unitOf();
   let labels, titleIdx;
   if(curRange==='week'){ labels=['一','二','三','四','五','六','日']; titleIdx=(new Date().getDay()+6)%7; }
@@ -2069,11 +1852,12 @@ function renderWeight(){
   const svg=document.getElementById('weightSvg'), W=340,H=150,pad=16;
   const ws=state.weights.slice(-12);
   const last = ws.length? ws[ws.length-1].kg+' kg':'未记录';
-  document.getElementById('curWeight').textContent=last;
-  document.getElementById('hlWeight').textContent = ws.length? ws[ws.length-1].kg+' kg':'--';
-  document.getElementById('homeWeight').textContent = ws.length? ws[ws.length-1].kg:'--';
-  if(ws.length<2){ svg.innerHTML=''; document.getElementById('weightTip').style.display='block'; return; }
-  document.getElementById('weightTip').style.display='none';
+  setTxt('curWeight',last);
+  setTxt('hlWeight',ws.length? ws[ws.length-1].kg+' kg':'--');
+  setTxt('homeWeight',ws.length? ws[ws.length-1].kg:'--');
+  if(!svg) return;
+  if(ws.length<2){ svg.innerHTML=''; setStyle('weightTip','display','block'); return; }
+  setStyle('weightTip','display','none');
   const vals=ws.map(function(w){ return w.kg; });
   const min=Math.min.apply(null,vals)-0.5, max=Math.max.apply(null,vals)+0.5;
   const step=(W-pad*2)/(ws.length-1);
@@ -2096,8 +1880,8 @@ function saveWeight(){
   const i=state.weights.findIndex(function(w){ return w.date===date; });
   if(i>=0) state.weights[i].kg=v; else state.weights.push({date:date,kg:v});
   state.weights.sort(function(a,b){ return a.date.localeCompare(b.date); });
-  document.getElementById('setWeight').textContent=v+' kg';
-  save(); closeModal(); renderTrend(); renderHealth(); toast('已记录：'+v+' kg');
+  setTxt('setWeight',v+' kg');
+  save(); closeModal(); renderTrend(); renderHealth(); renderWeight(); toast('已记录：'+v+' kg');
 }
 function openWaterGoal(){
   openModal('<h3>💧 饮水目标</h3>'
@@ -2159,30 +1943,32 @@ function macroGoals(){
   const g=state.goal;
   return {p:+(g*0.35/4).toFixed(1), c:+(g*0.25/4).toFixed(1), f:+(g*0.40/9).toFixed(1)};
 }
+function setTxt(id,v){ const e=document.getElementById(id); if(e)e.textContent=v; }
+function setStyle(id,p,v){ const e=document.getElementById(id); if(e)e.style[p]=v; }
 function refreshMacros(){
   const G=macroGoals();
   const remain=Math.max(0, state.goal + state.burned - state.eaten.kcal);
-  document.getElementById('goalKcal').textContent=state.goal;
-  document.getElementById('setGoal').textContent=state.goal+' kcal';
-  document.getElementById('remainKcal').textContent=remain;
-  document.getElementById('burnedKcal').textContent='+'+state.burned+' kcal';
-  document.getElementById('burnBtnVal').textContent=state.burned;
-  document.getElementById('mealGoal').textContent=remain;
+  setTxt('goalKcal',state.goal);
+  setTxt('setGoal',state.goal+' kcal');
+  setTxt('remainKcal',remain);
+  setTxt('burnedKcal','+'+state.burned+' kcal');
+  setTxt('burnBtnVal',state.burned);
+  setTxt('mealGoal',remain);
   ['p','c','f'].forEach(function(k){
     const goal=G[k], now=state.eaten[k];
-    document.getElementById(k+'Now').textContent=now;
-    document.getElementById(k+'Goal').textContent=goal;
-    document.getElementById(k+'Left').textContent=Math.max(0, +(goal-now).toFixed(1));
-    document.getElementById(k+'Bar').style.width=Math.min(100, now/goal*100)+'%';
+    setTxt(k+'Now',now);
+    setTxt(k+'Goal',goal);
+    setTxt(k+'Left',Math.max(0, +(goal-now).toFixed(1)));
+    setStyle(k+'Bar','width',Math.min(100, now/goal*100)+'%');
   });
-  document.getElementById('waterMl').textContent=state.water;
-  document.getElementById('waterMlHome').textContent=state.water;
-  document.getElementById('waterGoalTxt').textContent=state.waterGoal;
-  document.getElementById('waterGoalHome').textContent=state.waterGoal;
+  setTxt('waterMlHome',state.water);
+  setTxt('waterGoalTxt',state.waterGoal);
+  setTxt('waterGoalHome',state.waterGoal);
   renderMeals();
 }
 function renderMeals(){
   const el=document.getElementById('mealList');
+  if(!el) return;
   el.innerHTML = state.meals.length===0
     ? '<p class="empty-meal">今天还没有记录，拍照或手动添加吧 🍽</p>'
     : state.meals.map(function(m){
@@ -2190,29 +1976,6 @@ function renderMeals(){
           + (m.img? '<img class="mealthumb" src="'+m.img+'">':'')
           + '<div style="flex:1"><p class="n">'+m.name+'</p><p class="m">蛋白 '+m.p+'g · 碳水 '+m.c+'g · 脂肪 '+m.f+'g · '+m.time+'</p></div>'
           + '<span class="k">+'+m.kcal+'</span></div>'; }).join('');
-}
-(function(){
-  const dws=['周二','周三','周四','周五','周六','周日','周一'];
-  const strip=document.getElementById('weekStrip');
-  strip.innerHTML = dws.map(function(dw,i){
-    return '<div class="wday'+(i===3?' on':'')+'" data-d="'+(i+1)+'"><div class="dw">'+dw+'</div><div class="dn">'+(i+1)+'</div></div>';
-  }).join('');
-  strip.querySelectorAll('.wday').forEach(function(w){ w.addEventListener('click',function(){
-    strip.querySelectorAll('.wday').forEach(function(x){ x.classList.remove('on'); }); w.classList.add('on');
-  });});
-})();
-(function(){
-  const d=new Date();
-  document.getElementById('mealDate').textContent = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  document.getElementById('monthLabel').textContent = d.getFullYear()+'年'+(d.getMonth()+1)+'月';
-})();
-function openMonths(){
-  const y=new Date().getFullYear();
-  let h='<h3>跳至月份</h3>';
-  for(let i=1;i<=12;i++){
-    h+='<div class="foodrow" onclick="document.getElementById(\'monthLabel\').textContent=\''+y+'年'+i+'月\';closeModal();"><div><p class="n">'+y+'年'+i+'月</p></div><span class="k">›</span></div>';
-  }
-  openModal(h);
 }
 const FOODDB=[
  {n:'鸡胸肉（熟）',k:165,p:31,c:0,f:3.6,u:'100g'},
@@ -2237,6 +2000,7 @@ const FOODDB=[
  {n:'玉米',k:86,p:3.3,c:19,f:1.2,u:'100g'}
 ];
 function renderFoodDb(){
+  if(!document.getElementById('scanSearch')) return;
   const q=(document.getElementById('scanSearch').value||'').trim();
   const list=FOODDB.filter(function(f){ return f.n.indexOf(q)>=0; });
   document.getElementById('foodDb').innerHTML = list.length===0
@@ -2634,6 +2398,7 @@ function ringC(id,p){
   el.setAttribute('stroke-dasharray', (Math.min(1,p)*C)+' '+C);
 }
 function renderHealth(){
+  if(!document.getElementById('healthConn')) return;
   const H=state.health;
   ringC('ring1', state.burned/500);
   ringC('ring2', H.exerciseMin/30);
@@ -2850,15 +2615,22 @@ function demoHealth(){
 }
 function addWater(ml){
   state.water=state.water+ml;
-  document.getElementById('waterMl').textContent=state.water;
-  document.getElementById('waterMlHome').textContent=state.water;
+  setTxt('waterMl',state.water);
+  setTxt('waterMlHome',state.water);
   if(state.water>=state.waterGoal) toast('今日饮水目标达成 💧🎉');
   save();
 }
 
 /* ================= 游泳 ================= */
 const SWIM_STYLES=['自由泳','蛙泳','仰泳','蝶泳'];
-let SWIM_VIEW='week', SWIM_DETAIL_IDX=null;
+let SWIM_VIEW='week', SWIM_DETAIL_IDX=null, SWIM_OFFSET=0;
+function swimPerLabel(base, off){
+  if(off===0) return '本'+base;
+  const n=Math.abs(off), dir=off>0?'上':'下';
+  if(base==='年'){ if(n===1) return (dir==='上'?'去年':'明年'); return (dir==='上'?n+'年前':n+'年后'); }
+  if(n===1) return dir+base;
+  return dir+n+base;
+}
 
 function swimOf(){ if(!state.swim) state.swim={connected:false,hist:[]}; return state.swim; }
 
@@ -2953,12 +2725,13 @@ function enrichSwim(r){
 }
 
 function setSwimPeriod(p){
-  SWIM_VIEW=p;
+  SWIM_VIEW=p; SWIM_OFFSET=0;
   document.querySelectorAll('.swimtabs button').forEach(function(b){
     b.classList.toggle('on', b.dataset.per===p);
   });
   renderSwim();
 }
+function changeSwimOffset(dir){ SWIM_OFFSET+=dir; renderSwim(); }
 
 function renderSwim(){
   const S=swimOf();
@@ -2970,23 +2743,26 @@ function renderSwim(){
   let bars=[], mx=1, dist=0, mins=0, kcal=0;
 
   if(SWIM_VIEW==='week'){
-    distU='本周 (m)'; minsU='时长 (分)'; kcalU='消耗 (kcal)';
-    const weekAgo=new Date(now.getTime()-6*864e5);
-    rangeLabel=fmtMD(weekAgo)+' - '+fmtMD(now);
-    const wk=S.hist.filter(function(r){ const d=new Date(r.d+'T00:00:00'); return d>=new Date(weekAgo.toDateString()); });
+    const anchor=new Date(now.getFullYear(),now.getMonth(),now.getDate()-7*SWIM_OFFSET);
+    const weekAgo=new Date(anchor.getTime()-6*864e5);
+    rangeLabel=fmtMD(weekAgo)+' - '+fmtMD(anchor);
+    distU=swimPerLabel('周',SWIM_OFFSET)+' (m)'; minsU='时长 (分)'; kcalU='消耗 (kcal)';
+    const wk=S.hist.filter(function(r){ const d=new Date(r.d+'T00:00:00'); return d>=new Date(weekAgo.toDateString()) && d<=new Date(anchor.toDateString()); });
     dist=wk.reduce(function(a,r){return a+r.dist;},0); mins=wk.reduce(function(a,r){return a+r.mins;},0); kcal=wk.reduce(function(a,r){return a+(r.kcal||0);},0);
     for(let i=6;i>=0;i--){
-      const d=new Date(now.getTime()-i*864e5); const k=d.toISOString().slice(0,10);
+      const d=new Date(anchor.getTime()-i*864e5); const k=d.toISOString().slice(0,10);
       const v=S.hist.filter(function(r){return r.d===k;}).reduce(function(a,r){return a+r.dist;},0);
       bars.push({l:'日一二三四五六'[d.getDay()],v:v});
     }
   } else if(SWIM_VIEW==='month'){
-    distU='本月 (m)'; minsU='时长 (分)'; kcalU='消耗 (kcal)';
-    const y=now.getFullYear(), m=now.getMonth();
-    rangeLabel=(m+1)+'月';
+    const mNow=new Date(now.getFullYear(),now.getMonth()-SWIM_OFFSET,1);
+    const y=mNow.getFullYear(), m=mNow.getMonth();
     const monthStart=new Date(y,m,1);
-    const daysInMonth=new Date(y,m+1,0).getDate();
-    const mt=S.hist.filter(function(r){ const d=new Date(r.d+'T00:00:00'); return d>=monthStart; });
+    const monthEnd=new Date(y,m+1,0);
+    const daysInMonth=monthEnd.getDate();
+    rangeLabel=y+'年'+(m+1)+'月';
+    distU=swimPerLabel('月',SWIM_OFFSET)+' (m)'; minsU='时长 (分)'; kcalU='消耗 (kcal)';
+    const mt=S.hist.filter(function(r){ const d=new Date(r.d+'T00:00:00'); return d>=monthStart && d<=monthEnd; });
     dist=mt.reduce(function(a,r){return a+r.dist;},0); mins=mt.reduce(function(a,r){return a+r.mins;},0); kcal=mt.reduce(function(a,r){return a+(r.kcal||0);},0);
     for(let i=1;i<=daysInMonth;i++){
       const k=new Date(y,m,i).toISOString().slice(0,10);
@@ -2994,9 +2770,9 @@ function renderSwim(){
       bars.push({l:i%2===1?String(i):'',v:v});
     }
   } else {
-    distU='本年 (m)'; minsU='时长 (分)'; kcalU='消耗 (kcal)';
-    const y=now.getFullYear();
+    const y=now.getFullYear()-SWIM_OFFSET;
     rangeLabel=y+'年';
+    distU=swimPerLabel('年',SWIM_OFFSET)+' (m)'; minsU='时长 (分)'; kcalU='消耗 (kcal)';
     const yt=S.hist.filter(function(r){return new Date(r.d+'T00:00:00').getFullYear()===y;});
     dist=yt.reduce(function(a,r){return a+r.dist;},0); mins=yt.reduce(function(a,r){return a+r.mins;},0); kcal=yt.reduce(function(a,r){return a+(r.kcal||0);},0);
     for(let i=0;i<12;i++){
