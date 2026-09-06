@@ -1,0 +1,22 @@
+{
+  "name": "cloudkit-sync",
+  "version": "1.0.0",
+  "description": "CloudKit private database sync for the VolumeX 锻炼 fitness app (iOS native).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "keywords": [
+    "capacitor",
+    "plugin",
+    "cloudkit",
+    "ios"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/core": "^6.0.0"
+  }
+}

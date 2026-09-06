@@ -803,6 +803,37 @@ const DEFAULT = {
           stepsWeek:[0,0,0,0,0,0,0],sleepWeek:[0,0,0,0,0,0,0]}
 };
 let state = load();
+
+/* ============ CloudKit 私有数据库同步（iOS 原生；不可用时自动回退本地） ============ */
+function cloudAvailable(){
+  try {
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()
+      && window.Capacitor.Plugins && window.Capacitor.Plugins.CloudKitSync);
+  } catch(e){ return false; }
+}
+let _cloudTimer = null;
+function cloudSave(){
+  if(!cloudAvailable()) return;
+  const json = JSON.stringify(state);
+  if(_cloudTimer) clearTimeout(_cloudTimer);
+  _cloudTimer = setTimeout(function(){
+    try { window.Capacitor.Plugins.CloudKitSync.save({ value: json }).catch(function(){}); } catch(e){}
+  }, 1500);
+}
+async function cloudLoad(){
+  if(!cloudAvailable()) return;
+  try {
+    const res = await window.Capacitor.Plugins.CloudKitSync.fetch({});
+    const v = res && res.value;
+    if(v && v.length){
+      const remote = JSON.parse(v);
+      if(remote && typeof remote === 'object'){
+        // 云端优先：加载时用云端覆盖本地（个人单用户跨设备同步，最后加载者胜出）
+        state = Object.assign({}, DEFAULT, remote);
+      }
+    }
+  } catch(e){ /* 忽略：保留本地数据 */ }
+}
 function load(){
   try{ const s=localStorage.getItem('volumex'); if(s) return Object.assign(JSON.parse(JSON.stringify(DEFAULT)), JSON.parse(s)); }catch(e){}
   return JSON.parse(JSON.stringify(DEFAULT));
@@ -3077,20 +3108,23 @@ function doReset(){
 /* ================= 初始化 ================= */
 syncRookie();
 renderDays();
-refreshMacros();
-renderTrend();
-renderHealth();
-renderSwim();
-document.getElementById('planCountHome').textContent=state.plans.length;
-document.getElementById('plansCount').textContent=state.plans.length+' / 6';
-document.getElementById('setWaterGoal').textContent=state.waterGoal+' ml';
-if(state.weights.length){
-  document.getElementById('setWeight').textContent=state.weights[state.weights.length-1].kg+' kg';
-}
-if(state.ai.key) document.getElementById('setAi').textContent='已连接';
-renderFoodDb();
-renderLibTabs(); renderLib();
-switchTab('rookie');
+/* 先从 CloudKit 私有数据库拉取云端数据（若有），再渲染界面 */
+cloudLoad().finally(function(){
+  refreshMacros();
+  renderTrend();
+  renderHealth();
+  renderSwim();
+  document.getElementById('planCountHome').textContent=state.plans.length;
+  document.getElementById('plansCount').textContent=state.plans.length+' / 6';
+  document.getElementById('setWaterGoal').textContent=state.waterGoal+' ml';
+  if(state.weights.length){
+    document.getElementById('setWeight').textContent=state.weights[state.weights.length-1].kg+' kg';
+  }
+  if(state.ai.key) document.getElementById('setAi').textContent='已连接';
+  renderFoodDb();
+  renderLibTabs(); renderLib();
+  switchTab('rookie');
+});
 </script>
 <script>
 /* 注册 Service Worker（https 或 localhost 下生效，用于添加到桌面后离线可用） */

@@ -19,6 +19,7 @@
     "@capacitor/local-notifications": "^6.1.0"
   },
   "dependencies": {
+    "cloudkit-sync": "file:./cloudkit-sync",
     "cordova-plugin-health": "^3.2.4"
   }
 }
