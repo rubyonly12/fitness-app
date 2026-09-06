@@ -2468,7 +2468,7 @@ function renderHealth(){
   document.getElementById('hlHr').textContent=H.hr||'--';
   document.getElementById('hlSpo2').textContent=H.spo2||'--';
   document.getElementById('hlSleep').textContent=H.sleepH||'--';
-  document.getElementById('healthConn').textContent = H.connected?'已连接（数据手动/导入同步）':'未连接 · 数据需手动录入或导入';
+  document.getElementById('healthConn').textContent = H.connected?'已连接（HealthKit 自动读取）':'未连接 · 点击按钮连接 Apple Health';
   const maxS=Math.max.apply(null,H.stepsWeek.concat([1]));
   document.getElementById('stepsBar').innerHTML = H.stepsWeek.map(function(v,i){
     const on=i===((new Date().getDay()+6)%7);
@@ -2510,7 +2510,7 @@ function hkQueryAll(h){
     H.stepsWeek[(new Date().getDay()+6)%7]=H.steps;
     H.sleepWeek[(new Date().getDay()+6)%7]=Math.round((H.sleepH||0)*10)/10;
     save(); renderHealth();
-    toast('Apple Health 已连接 ✅ 数据已同步');
+    toast('Apple Health 已连接 ✅ 数据已刷新');
   }
   // 1 今日步数
   h.queryAggregated({startDate:t0, endDate:now, dataType:'steps'}, function(d){
@@ -2564,11 +2564,80 @@ function hkQueryAll(h){
     part();
   }, function(e){ console.warn('hk stepswk',e); part(); });
 }
+/* 同步 Apple Health 中的游泳记录（HKWorkout，类型 swimming / swimming.pool / swimming.open_water） */
+function syncSwimHealth(){
+  if(!hkAvail()){ openSwimNoNative(); return; }
+  const h = window.cordova.plugins.health;
+  const S = swimOf();
+  toast('正在同步游泳记录…');
+  h.requestAuthorization({
+    read:['activity','distance','calories.active']
+  }, function(){
+    const now = new Date();
+    const start = new Date(now.getTime() - 365*24*3600*1000);
+    h.query({
+      startDate:start,
+      endDate:now,
+      dataType:'activity',
+      includeCalories:true,
+      includeDistance:true,
+      limit:1000
+    }, function(d){
+      let cnt=0, dup=0;
+      const existing={};
+      S.hist.forEach(function(r){ if(r.hid) existing[r.hid]=true; });
+      (d||[]).forEach(function(x){
+        const v=(x.value||'').toLowerCase();
+        if(v.indexOf('swimming')!==0) return;
+        if(!x.id){ return; }
+        if(existing[x.id]){ dup++; return; }
+        const sd=new Date(x.startDate), ed=new Date(x.endDate);
+        const mins=Math.max(1, Math.round((ed-sd)/60000));
+        const dist=Math.round(x.distance||0);
+        const kcal=Math.round(x.calories||0);
+        const style = v==='swimming.open_water'?'公开水域':v==='swimming.pool'?'泳池游泳':'游泳';
+        const rec={
+          d: sd.toISOString().slice(0,10),
+          style: style,
+          dist: dist,
+          mins: mins,
+          kcal: kcal,
+          t0: fmtHmFromDate(sd),
+          t1: fmtHmFromDate(ed),
+          poolLen: 25,
+          hid: x.id,
+          source: 'Health'
+        };
+        enrichSwim(rec);
+        S.hist.push(rec);
+        existing[x.id]=true;
+        cnt++;
+      });
+      if(cnt>0){
+        S.hist.sort(function(a,b){ return a.d<b.d?-1:1; });
+        S.connected=true;
+        save(); renderSwim();
+        toast('已同步 '+cnt+' 条游泳记录 ✅');
+      }else if(dup>0){
+        toast('游泳记录已是最新，没有新增');
+      }else{
+        toast('Apple Health 中暂无游泳记录');
+      }
+    }, function(e){
+      console.warn('hk swim query', e);
+      toast('同步失败：'+e);
+    });
+  }, function(err){
+    console.warn('HK swim auth', err);
+    toast('无法获取游泳权限');
+  });
+}
+
 function openHealthSync(){
   if(hkAvail()){ syncAppleHealth(); return; }
   const H=state.health;
   openModal('<h3>❤️ 连接 Apple Health</h3>'
-    + '<p class="note" style="margin-bottom:14px;">说明：当前运行在网页环境中，无法直接读取 iPhone 健康数据（HealthKit），可在此手动录入 / 定期导入。在「锻炼」原生 App 中点击连接，即可自动同步步数、锻炼、心率、睡眠等数据。</p>'
+    + '<p class="note" style="margin-bottom:14px;">说明：HealthKit 不可用或用户拒绝了权限，可在此手动录入 / 定期导入。在原生 App 中点击连接，即可自动同步步数、锻炼、心率、睡眠等数据。</p>'
     + '<div class="mrow">'
     + '<div class="mfield"><label>今日步数</label><input id="hSteps" type="number" value="'+H.steps+'"></div>'
     + '<div class="mfield"><label>锻炼（分钟）</label><input id="hEx" type="number" value="'+H.exerciseMin+'"></div></div>'
@@ -2652,6 +2721,7 @@ function fmtMins(m){
   return mm+'分钟';
 }
 function fmtMD(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
+function fmtHmFromDate(d){ const h=d.getHours(),m=d.getMinutes(); return (h<10?'0':'')+h+':'+(m<10?'0':'')+m; }
 
 function genHrZones(mins,avg,max){
   const z1=Math.round(mins*0.55);
@@ -2791,10 +2861,14 @@ function renderSwim(){
 }
 
 function openSwimSync(){
+  if(hkAvail()){ syncSwimHealth(); return; }
+  openSwimNoNative();
+}
+function openSwimNoNative(){
   openModal('<h3>⌚ 连接 Apple Health</h3>'
-    + '<p class="note" style="margin-bottom:10px;">Apple 的 HealthKit 数据只有原生 App 能直接读取，网页版无法自动同步。两种方式使用：</p>'
+    + '<p class="note" style="margin-bottom:10px;">当前不在原生 App 中，无法读取 Apple HealthKit 的游泳数据。你可以：</p>'
     + '<div class="card" style="text-align:left;margin-bottom:12px;"><p style="font-size:13.5px;font-weight:800;">① 手动记录</p><p style="font-size:12.5px;font-weight:700;color:var(--muted);margin-top:4px;">每次游完在下方点击「＋ 记录」填写距离、时长与泳姿。</p></div>'
-    + '<div class="card" style="text-align:left;margin-bottom:16px;"><p style="font-size:13.5px;font-weight:800;">② 打包成原生 App（推荐）</p><p style="font-size:12.5px;font-weight:700;color:var(--muted);margin-top:4px;">用 Capacitor 等工具打包并申请 HealthKit 权限后，游泳数据可全自动同步，本页界面已就绪。</p></div>'
+    + '<div class="card" style="text-align:left;margin-bottom:16px;"><p style="font-size:13.5px;font-weight:800;">② 安装原生 App</p><p style="font-size:12.5px;font-weight:700;color:var(--muted);margin-top:4px;">用本项目的 Capacitor iOS 包安装后，可自动同步 Apple Watch/Health 的游泳记录。</p></div>'
     + '<button class="btn-primary" style="margin-bottom:10px;" onclick="demoSwim()">载入演示数据预览</button>'
     + '<button class="btn-ghost" style="width:100%;" onclick="closeModal()">关闭</button>');
 }
