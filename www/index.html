@@ -2615,14 +2615,24 @@ function syncSwimHealth(){
       includeDistance:true,
       limit:1000
     }, function(d){
-      let cnt=0, dup=0;
+      let cnt=0, dup=0, upd=0;
       const existing={};
-      S.hist.forEach(function(r){ if(r.hid) existing[r.hid]=true; });
+      S.hist.forEach(function(r){ if(r.hid) existing[r.hid]=r; });
       (d||[]).forEach(function(x){
         const v=(x.value||'').toLowerCase();
         if(v.indexOf('swimming')!==0) return;
         if(!x.id){ return; }
-        if(existing[x.id]){ dup++; return; }
+        if(existing[x.id]){
+          // 已同步过的旧记录：当时可能只记了通用泳姿（游泳/泳池游泳/公开水域）。
+          // 若这次 HealthKit 识别出了具体泳姿，就补写到老记录上，而不是直接跳过。
+          const old=existing[x.id];
+          if(x.strokeStyle && STROKE_CN[x.strokeStyle]
+             && (!old.style || old.style==='游泳' || old.style==='泳池游泳' || old.style==='公开水域')){
+            old.style=STROKE_CN[x.strokeStyle];
+            upd++;
+          }
+          dup++; return;
+        }
         const sd=new Date(x.startDate), ed=new Date(x.endDate);
         const mins=Math.max(1, Math.round((ed-sd)/60000));
         const dist=Math.round(x.distance||0);
@@ -2651,7 +2661,11 @@ function syncSwimHealth(){
         S.hist.sort(function(a,b){ return a.d<b.d?-1:1; });
         S.connected=true;
         save(); renderSwim();
-        toast('已同步 '+cnt+' 条游泳记录 ✅');
+        toast('已同步 '+cnt+' 条游泳记录'+(upd>0?('，并补全 '+upd+' 条旧记录的泳姿'):'')+' ✅');
+      }else if(upd>0){
+        S.connected=true;
+        save(); renderSwim();
+        toast('已为 '+upd+' 条旧记录补全泳姿 ✅');
       }else if(dup>0){
         toast('游泳记录已是最新，没有新增');
       }else{
@@ -2751,8 +2765,11 @@ function swimCount(rec,S){
     if(sameMonth(xd,rd)) cm++;
     if(sameYear(xd,rd)) cy++;
   });
-  // 按日期排序后，确定这条记录是全部游泳历史中的第几次（从 1 开始）
-  const sorted = S.hist.slice().sort(function(a,b){ return a.d<b.d?-1:1; });
+  // 按日期+开始时间排序后，确定这条记录是全部游泳历史中的第几次（从 1 开始）
+  const sorted = S.hist.slice().sort(function(a,b){
+    if(a.d!==b.d) return a.d<b.d?-1:1;
+    return (a.t0||'')<(b.t0||'')?-1:1;
+  });
   let ca = sorted.findIndex(function(x){ return x === rec; }) + 1;
   if(ca === 0){ // 对象引用不一致时按日期兜底（适合导入/克隆场景）
     ca = sorted.findIndex(function(x){ return x.d === rec.d; }) + 1;
