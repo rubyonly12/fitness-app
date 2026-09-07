@@ -2757,22 +2757,40 @@ function swimEqFood(kcal){
 }
 function sameMonth(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth(); }
 function sameYear(a,b){ return a.getFullYear()===b.getFullYear(); }
+function swimT0Min(r){ const p=(r.t0||'18:00').split(':'); return (+p[0])*60+(+p[1]); }
+/* 统计口径：演示数据不参与计数；同一天开始时间相差 15 分钟内的记录视为同一场游泳，只算一次。
+   手动添加与 Health 同步重复、或重复同步造成的重复条目都会被合并，避免次数虚高。 */
+function swimStatList(S){
+  const list=[];
+  S.hist.slice()
+    .filter(function(r){ return !r.demo; })
+    .sort(function(a,b){
+      if(a.d!==b.d) return a.d<b.d?-1:1;
+      return swimT0Min(a)-swimT0Min(b);
+    })
+    .forEach(function(r){
+      const dup=list.some(function(o){ return o.d===r.d && Math.abs(swimT0Min(o)-swimT0Min(r))<=15; });
+      if(!dup) list.push(r);
+    });
+  return list;
+}
 function swimCount(rec,S){
   const rd = new Date(rec.d+'T00:00:00');
-  let cm=0,cy=0;
-  S.hist.forEach(function(x){
+  const list = swimStatList(S);   // 已剔除演示数据并合并同一场游泳的重复条目
+  let cm=0,cy=0,ca=0;
+  const recMin=swimT0Min(rec);
+  for(let i=0;i<list.length;i++){
+    const x=list[i];
     const xd=new Date(x.d+'T00:00:00');
     if(sameMonth(xd,rd)) cm++;
     if(sameYear(xd,rd)) cy++;
-  });
-  // 按日期+开始时间排序后，确定这条记录是全部游泳历史中的第几次（从 1 开始）
-  const sorted = S.hist.slice().sort(function(a,b){
-    if(a.d!==b.d) return a.d<b.d?-1:1;
-    return (a.t0||'')<(b.t0||'')?-1:1;
-  });
-  let ca = sorted.findIndex(function(x){ return x === rec; }) + 1;
-  if(ca === 0){ // 对象引用不一致时按日期兜底（适合导入/克隆场景）
-    ca = sorted.findIndex(function(x){ return x.d === rec.d; }) + 1;
+    // 名次：同一对象，或同一天开始时间相差 15 分钟内视为同一场
+    if(ca===0 && (x===rec || (x.d===rec.d && Math.abs(swimT0Min(x)-recMin)<=15))) ca=i+1;
+  }
+  if(ca===0){ // 该条被去重剔除（如演示数据）时，按日期顺序估算名次
+    let n=1;
+    list.forEach(function(x){ if(x.d<rec.d) n++; });
+    ca=n;
   }
   return {m:cm,y:cy,a:ca};
 }
@@ -2952,8 +2970,10 @@ function openSwimNoNative(){
     + '<div class="card" style="text-align:left;margin-bottom:12px;"><p style="font-size:13.5px;font-weight:800;">① 手动记录</p><p style="font-size:12.5px;font-weight:700;color:var(--muted);margin-top:4px;">每次游完在下方点击「＋ 记录」填写距离、时长与泳姿。</p></div>'
     + '<div class="card" style="text-align:left;margin-bottom:16px;"><p style="font-size:13.5px;font-weight:800;">② 安装原生 App</p><p style="font-size:12.5px;font-weight:700;color:var(--muted);margin-top:4px;">用本项目的 Capacitor iOS 包安装后，可自动同步 Apple Watch/Health 的游泳记录。</p></div>'
     + '<button class="btn-primary" style="margin-bottom:10px;" onclick="demoSwim()">载入演示数据预览</button>'
+    + '<button class="btn-ghost" style="width:100%;margin-bottom:10px;" onclick="clearDemoSwim()">清除演示数据（'+demoSwimCount()+' 条）</button>'
     + '<button class="btn-ghost" style="width:100%;" onclick="closeModal()">关闭</button>');
 }
+function demoSwimCount(){ return swimOf().hist.filter(function(r){ return r.demo; }).length; }
 function demoSwim(){
   const S=swimOf(); const today=new Date();
   const mk=function(off,st,di,mi,t0,pool,hrBase){
@@ -2961,7 +2981,7 @@ function demoSwim(){
     const parts=(t0||'18:00').split(':'); const base=parseInt(parts[0],10)*60+parseInt(parts[1],10);
     const rec={d:d.toISOString().slice(0,10),style:st,dist:di,mins:mi,kcal:Math.round(mi*9.2),
       t0:t0||'18:00',t1:fmtHm(base+mi),poolLen:pool||25,avgHR:hrBase||121,maxHR:(hrBase||121)+14,
-      hrMin:(hrBase||121)-16};
+      hrMin:(hrBase||121)-16,demo:true};
     return enrichSwim(rec);
   };
   S.hist=[
@@ -2970,7 +2990,17 @@ function demoSwim(){
     mk(5,'自由泳',1800,38,'18:30',25,124),
     mk(6,'混合泳',1000,28,'17:50',25,118)
   ];
-  S.connected=true; save(); closeModal(); renderSwim(); toast('已载入 4 条演示游泳记录');
+  S.connected=true; save(); closeModal(); renderSwim();
+  toast('已载入 4 条演示游泳记录（不参与次数统计）');
+}
+/* 清除演示数据：演示记录只用于预览界面，会污染真实统计，随时可一键清掉 */
+function clearDemoSwim(){
+  const S=swimOf();
+  const n=S.hist.filter(function(r){ return r.demo; }).length;
+  if(!n){ toast('没有演示数据'); return; }
+  S.hist=S.hist.filter(function(r){ return !r.demo; });
+  save(); closeModal(); renderSwim();
+  toast('已清除 '+n+' 条演示数据 ✅');
 }
 function openSwimAdd(){
   const st=SWIM_STYLES.map(function(s){ return '<option>'+s+'</option>'; }).join('');
