@@ -2598,9 +2598,6 @@ function syncSwimHealth(){
   if(!hkAvail()){ openSwimNoNative(); return; }
   const h = window.cordova.plugins.health;
   const S = swimOf();
-  // HealthKit 识别的泳姿（iOS 17+ HKWorkout.swimmingStrokeStyles）-> 中文
-  // other 不在此表，回退到「泳池游泳 / 公开水域」标签
-  const STROKE_CN = { freestyle:'自由泳', backstroke:'仰泳', breaststroke:'蛙泳', butterfly:'蝶泳', mixed:'混合泳', kickboard:'扶板打腿' };
   toast('正在同步游泳记录…');
   h.requestAuthorization({
     read:['activity','distance','calories.active']
@@ -2671,6 +2668,8 @@ function syncSwimHealth(){
       }else{
         toast('Apple Health 中暂无游泳记录');
       }
+      // 记录同步完成后，再独立去补一次泳姿（失败不影响上面的同步结果）
+      enrichSwimStylesFromHealth();
     }, function(e){
       console.warn('hk swim query', e);
       toast('同步失败：'+e);
@@ -2681,6 +2680,52 @@ function syncSwimHealth(){
   });
 }
 
+/* 泳姿补全（可选增强，与记录同步完全解耦）
+   HealthKit 的泳姿按「趟」记录在游泳距离样本的 metadata 上，需要单独查询。
+   这里在记录同步完成之后独立调用；查不到、超时、报错都静默降级，绝不影响同步。 */
+function enrichSwimStylesFromHealth(){
+  try{
+    if(typeof cordova==='undefined' || !cordova.exec) return;
+    const S=swimOf();
+    if(!S.hist.length) return;
+    let minD=null;
+    S.hist.forEach(function(r){ if(!minD || r.d<minD) minD=r.d; });
+    if(!minD) return;
+    const start=new Date(minD+'T00:00:00').getTime()-2*864e5;
+    const end=Date.now()+2*864e5;
+    let done=false;
+    const finish=function(arr){
+      if(done) return; done=true;
+      try{ applySwimStrokeSamples(arr||[], S); }catch(e){ console.warn('stroke apply', e); }
+    };
+    // 8 秒超时兜底：原生无响应也不会卡住界面
+    setTimeout(function(){ finish([]); }, 8000);
+    cordova.exec(finish, function(){ finish([]); },
+      'HealthKit', 'readSwimStrokeStyles', [{startDate:start, endDate:end}]);
+  }catch(e){ console.warn('stroke init', e); }
+}
+/* 把样本按「是否落在该条记录的时间窗内」归并，取出现最多的泳姿覆盖通用标签 */
+function applySwimStrokeSamples(samples,S){
+  if(!samples || !samples.length) return;
+  let upd=0;
+  S.hist.forEach(function(r){
+    if(r.style && !GENERIC_STYLES[r.style]) return;   // 已有具体泳姿的不动
+    const rs=new Date(r.d+'T'+(r.t0||'18:00')+':00').getTime();
+    let re=new Date(r.d+'T'+(r.t1||'')+':00').getTime();
+    if(isNaN(re)) re=rs+ (r.mins||30)*60000;
+    if(isNaN(rs)) return;
+    const tally={};
+    for(let i=0;i<samples.length;i++){
+      const ss=new Date(samples[i].start).getTime();
+      if(isNaN(ss)) continue;
+      if(ss>=rs-6e4 && ss<=re+6e4) tally[samples[i].stroke]=(tally[samples[i].stroke]||0)+1;
+    }
+    let best=null,bc=0;
+    for(const k in tally){ if(tally[k]>bc){ bc=tally[k]; best=k; } }
+    if(best && STROKE_CN[best]){ r.style=STROKE_CN[best]; upd++; }
+  });
+  if(upd>0){ save(); renderSwim(); toast('已按 iPhone 数据补全 '+upd+' 条泳姿 ✅'); }
+}
 function openHealthSync(){
   if(hkAvail()){ syncAppleHealth(); return; }
   const H=state.health;
@@ -2728,6 +2773,10 @@ function addWater(ml){
 
 /* ================= 游泳 ================= */
 const SWIM_STYLES=['自由泳','蛙泳','仰泳','蝶泳'];
+/* HealthKit 泳姿枚举（HKMetadataKeySwimmingStrokeStyle）-> 中文 */
+const STROKE_CN={ freestyle:'自由泳', backstroke:'仰泳', breaststroke:'蛙泳', butterfly:'蝶泳', mixed:'混合泳', kickboard:'扶板打腿' };
+/* 视为「尚无具体泳姿」的通用标签，可被 HealthKit 的真实泳姿覆盖 */
+const GENERIC_STYLES={ '游泳':1, '泳池游泳':1, '公开水域':1 };
 let SWIM_VIEW='week', SWIM_DETAIL_IDX=null, SWIM_OFFSET=0;
 function swimPerLabel(base, off){
   if(off===0) return '本'+base;
