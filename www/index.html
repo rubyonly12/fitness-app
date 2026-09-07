@@ -2777,22 +2777,22 @@ function swimStatList(S){
 function swimCount(rec,S){
   const rd = new Date(rec.d+'T00:00:00');
   const list = swimStatList(S);   // 已剔除演示数据并合并同一场游泳的重复条目
-  let cm=0,cy=0,ca=0;
   const recMin=swimT0Min(rec);
-  for(let i=0;i<list.length;i++){
-    const x=list[i];
-    const xd=new Date(x.d+'T00:00:00');
-    if(sameMonth(xd,rd)) cm++;
-    if(sameYear(xd,rd)) cy++;
-    // 名次：同一对象，或同一天开始时间相差 15 分钟内视为同一场
-    if(ca===0 && (x===rec || (x.d===rec.d && Math.abs(swimT0Min(x)-recMin)<=15))) ca=i+1;
+  // 定位当前记录在统计列表中的位置（同一对象，或同日开始时间相差 15 分钟内视为同一场）
+  let idx = list.findIndex(function(x){
+    return x===rec || (x.d===rec.d && Math.abs(swimT0Min(x)-recMin)<=15);
+  });
+  if(idx < 0){ // 该条被清洗剔除（如演示数据）时，按日期+时间顺序估算位置
+    idx = list.filter(function(x){ return x.d<rec.d || (x.d===rec.d && swimT0Min(x)<=recMin); }).length;
   }
-  if(ca===0){ // 该条被去重剔除（如演示数据）时，按日期顺序估算名次
-    let n=1;
-    list.forEach(function(x){ if(x.d<rec.d) n++; });
-    ca=n;
+  // 「第几次」= 截至这条记录（含）为止的名次，而不是当月/当年的总数：
+  let cm=0, cy=0;
+  for(let i=0;i<=idx && i<list.length;i++){
+    const xd=new Date(list[i].d+'T00:00:00');
+    if(sameMonth(xd,rd)) cm++;   // 当月第几场
+    if(sameYear(xd,rd)) cy++;    // 当年第几场
   }
-  return {m:cm,y:cy,a:ca};
+  return {m:cm,y:cy,a:idx+1};
 }
 function fmtHm(mins){
   const h=Math.floor(mins/60)%24, m=Math.round(mins%60);
