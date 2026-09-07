@@ -843,7 +843,11 @@ static NSString *const HKPluginKeyUUID = @"UUID";
 
     
 
-    NSSet *types = [NSSet setWithObjects:[HKWorkoutType workoutType], nil];
+    // 额外申请游泳距离样本的读权限：泳姿（HKMetadataKeySwimmingStrokeStyle）挂在这些样本上
+    HKQuantityType *swimDistType = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierDistanceSwimming];
+    NSSet *types = (swimDistType != nil)
+        ? [NSSet setWithObjects:[HKWorkoutType workoutType], swimDistType, nil]
+        : [NSSet setWithObjects:[HKWorkoutType workoutType], nil];
     [[HealthKit sharedHealthStore] requestAuthorizationToShareTypes:nil readTypes:types completion:^(BOOL success, NSError *error) {
         __block HealthKit *bSelf = self;
         if (!success) {
@@ -860,6 +864,8 @@ static NSString *const HKPluginKeyUUID = @"UUID";
                     });
                 } else {
                     NSMutableArray *finalResults = [[NSMutableArray alloc] initWithCapacity:results.count];
+                    // 游泳锻炼的时间窗，稍后据此查询每趟的泳姿样本
+                    NSMutableArray *swimWindows = [[NSMutableArray alloc] init];
 
                     for (HKWorkout *workout in results) {
                         NSString *workoutActivity = [WorkoutActivityConversion convertHKWorkoutActivityTypeToString:workout.workoutActivityType];
@@ -885,37 +891,15 @@ static NSString *const HKPluginKeyUUID = @"UUID";
                                 } mutableCopy
                             ];
 
-                        // 游泳：读取 HealthKit 识别出的泳姿（iOS 17+ 的 HKWorkout.swimmingStrokeStyles），
-                        // 取出现次数最多的泳姿作为本次锻炼的主泳姿，写回 strokeStyle 字段。
-                        // 用 performSelector: 而非点语法，保证在旧版 SDK 也能编译。
-                        if (workout.workoutActivityType == HKWorkoutActivityTypeSwimming &&
-                            [workout respondsToSelector:@selector(swimmingStrokeStyles)]) {
-                            NSArray *styles = [workout performSelector:@selector(swimmingStrokeStyles)];
-                            if (styles.count > 0) {
-                                NSMutableDictionary *tally = [NSMutableDictionary dictionary];
-                                for (NSNumber *s in styles) {
-                                    NSInteger v = [s integerValue];
-                                    if (v < 1 || v > 6) continue;
-                                    NSNumber *k = @(v);
-                                    tally[k] = @([tally[k] integerValue] + 1);
-                                }
-                                NSInteger best = 0, bestCount = -1;
-                                for (NSNumber *k in tally) {
-                                    NSInteger c = [tally[k] integerValue];
-                                    if (c > bestCount) { bestCount = c; best = [k integerValue]; }
-                                }
-                                NSString *stroke = nil;
-                                switch (best) {
-                                    case 1: stroke = @"mixed"; break;
-                                    case 2: stroke = @"freestyle"; break;
-                                    case 3: stroke = @"backstroke"; break;
-                                    case 4: stroke = @"breaststroke"; break;
-                                    case 5: stroke = @"butterfly"; break;
-                                    case 6: stroke = @"other"; break;
-                                    default: stroke = nil; break;
-                                }
-                                if (stroke) entry[@"strokeStyle"] = stroke;
-                            }
+                        // 泳姿不在这里读取：HKWorkout 上没有泳姿属性，需要查该时间窗内的
+                        // 游泳距离样本（HKQuantityTypeIdentifierDistanceSwimming）的
+                        // HKMetadataKeySwimmingStrokeStyle 元数据，见下方统一处理。
+                        if (workout.workoutActivityType == HKWorkoutActivityTypeSwimming) {
+                            [swimWindows addObject:@{
+                                @"entry": entry,
+                                @"start": workout.startDate,
+                                @"end": workout.endDate
+                            }];
                         }
 
                         if(includeCalories != nil && includeCalories) {
@@ -935,10 +919,69 @@ static NSString *const HKPluginKeyUUID = @"UUID";
                         [finalResults addObject:entry];
                     }
 
-                    dispatch_sync(dispatch_get_main_queue(), ^{
-                        CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:finalResults];
-                        [bSelf.commandDelegate sendPluginResult:result callbackId:command.callbackId];
-                    });
+                    // 没有游泳记录时直接返回
+                    if (swimWindows.count == 0) {
+                        dispatch_sync(dispatch_get_main_queue(), ^{
+                            CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:finalResults];
+                            [bSelf.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+                        });
+                        return;
+                    }
+
+                    // 为每条游泳锻炼查询该时间窗内的游泳距离样本，
+                    // 读取每趟的 HKMetadataKeySwimmingStrokeStyle，取出现次数最多的泳姿。
+                    __block NSInteger pendingSwim = swimWindows.count;
+                    for (NSDictionary *win in swimWindows) {
+                        NSPredicate *dayPredicate = [HKQuery predicateForSamplesWithStartDate:win[@"start"]
+                                                                                      endDate:win[@"end"]
+                                                                                      options:HKQueryOptionStrictStartDate];
+                        HKSampleQuery *swimQuery = [[HKSampleQuery alloc]
+                            initWithSampleType:[HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierDistanceSwimming]
+                                     predicate:dayPredicate
+                                         limit:HKObjectQueryNoLimit
+                               sortDescriptors:nil
+                                resultsHandler:^(HKSampleQuery *q, NSArray *samples, NSError *swimError) {
+                            if (!swimError && samples.count > 0) {
+                                NSMutableDictionary *tally = [NSMutableDictionary dictionary];
+                                for (HKQuantitySample *sample in samples) {
+                                    NSNumber *st = sample.metadata[@"HKMetadataKeySwimmingStrokeStyle"];
+                                    if (!st) continue;
+                                    NSInteger v = [st integerValue];
+                                    if (v < 1 || v > 6) continue;   // 0=unknown 不参与统计
+                                    NSNumber *k = @(v);
+                                    tally[k] = @([tally[k] integerValue] + 1);
+                                }
+                                NSInteger best = 0, bestCount = -1;
+                                for (NSNumber *k in tally) {
+                                    NSInteger c = [tally[k] integerValue];
+                                    if (c > bestCount) { bestCount = c; best = [k integerValue]; }
+                                }
+                                NSString *stroke = nil;
+                                switch (best) {
+                                    case 1: stroke = @"mixed"; break;        // 混合泳
+                                    case 2: stroke = @"freestyle"; break;    // 自由泳
+                                    case 3: stroke = @"backstroke"; break;   // 仰泳
+                                    case 4: stroke = @"breaststroke"; break; // 蛙泳
+                                    case 5: stroke = @"butterfly"; break;    // 蝶泳
+                                    case 6: stroke = @"kickboard"; break;    // 打腿板
+                                    default: stroke = nil; break;
+                                }
+                                if (stroke) {
+                                    NSMutableDictionary *ent = win[@"entry"];
+                                    ent[@"strokeStyle"] = stroke;
+                                }
+                            }
+
+                            pendingSwim--;
+                            if (pendingSwim == 0) {
+                                dispatch_sync(dispatch_get_main_queue(), ^{
+                                    CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:finalResults];
+                                    [bSelf.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+                                });
+                            }
+                        }];
+                        [[HealthKit sharedHealthStore] executeQuery:swimQuery];
+                    }
                 }
             }];
             [[HealthKit sharedHealthStore] executeQuery:query];

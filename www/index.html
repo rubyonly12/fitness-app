@@ -2600,7 +2600,7 @@ function syncSwimHealth(){
   const S = swimOf();
   // HealthKit 识别的泳姿（iOS 17+ HKWorkout.swimmingStrokeStyles）-> 中文
   // other 不在此表，回退到「泳池游泳 / 公开水域」标签
-  const STROKE_CN = { freestyle:'自由泳', backstroke:'仰泳', breaststroke:'蛙泳', butterfly:'蝶泳', mixed:'混合泳' };
+  const STROKE_CN = { freestyle:'自由泳', backstroke:'仰泳', breaststroke:'蛙泳', butterfly:'蝶泳', mixed:'混合泳', kickboard:'扶板打腿' };
   toast('正在同步游泳记录…');
   h.requestAuthorization({
     read:['activity','distance','calories.active']
