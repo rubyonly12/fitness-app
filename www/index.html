@@ -2600,7 +2600,8 @@ function syncSwimHealth(){
   const S = swimOf();
   toast('正在同步游泳记录…');
   h.requestAuthorization({
-    read:['activity','distance','calories.active']
+    // distance.swimming：泳姿数据采集在它的样本上，必须一并申请读权限
+    read:['activity','distance','calories.active','distance.swimming']
   }, function(){
     const now = new Date();
     const start = new Date(now.getTime() - 365*24*3600*1000);
@@ -2694,19 +2695,25 @@ function enrichSwimStylesFromHealth(){
     const start=new Date(minD+'T00:00:00').getTime()-2*864e5;
     const end=Date.now()+2*864e5;
     let done=false;
-    const finish=function(arr){
+    const finish=function(arr, report){
       if(done) return; done=true;
-      try{ applySwimStrokeSamples(arr||[], S); }catch(e){ console.warn('stroke apply', e); }
+      try{
+        const n=applySwimStrokeSamples(arr||[], S);
+        // 仅在「原生正常返回但一条样本都没有」时提示，便于判断是否是权限问题
+        if(report && !(arr||[]).length && n===0){
+          toast('未读到泳姿样本：请确认已授权「游泳距离」（必要时删除 App 重装）');
+        }
+      }catch(e){ console.warn('stroke apply', e); }
     };
     // 8 秒超时兜底：原生无响应也不会卡住界面
-    setTimeout(function(){ finish([]); }, 8000);
-    cordova.exec(finish, function(){ finish([]); },
+    setTimeout(function(){ finish([], false); }, 8000);
+    cordova.exec(function(arr){ finish(arr, true); }, function(){ finish([], false); },
       'HealthKit', 'readSwimStrokeStyles', [{startDate:start, endDate:end}]);
   }catch(e){ console.warn('stroke init', e); }
 }
 /* 把样本按「是否落在该条记录的时间窗内」归并，取出现最多的泳姿覆盖通用标签 */
 function applySwimStrokeSamples(samples,S){
-  if(!samples || !samples.length) return;
+  if(!samples || !samples.length) return 0;
   let upd=0;
   S.hist.forEach(function(r){
     if(r.style && !GENERIC_STYLES[r.style]) return;   // 已有具体泳姿的不动
@@ -2725,6 +2732,7 @@ function applySwimStrokeSamples(samples,S){
     if(best && STROKE_CN[best]){ r.style=STROKE_CN[best]; upd++; }
   });
   if(upd>0){ save(); renderSwim(); toast('已按 iPhone 数据补全 '+upd+' 条泳姿 ✅'); }
+  return upd;
 }
 function openHealthSync(){
   if(hkAvail()){ syncAppleHealth(); return; }

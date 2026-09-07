@@ -7,6 +7,8 @@ dataTypes['mindfulness'] = 'HKCategoryTypeIdentifierMindfulSession';
 dataTypes['steps'] = 'HKQuantityTypeIdentifierStepCount';
 dataTypes['stairs'] = 'HKQuantityTypeIdentifierFlightsClimbed';
 dataTypes['distance'] = 'HKQuantityTypeIdentifierDistanceWalkingRunning'; // and HKQuantityTypeIdentifierDistanceCycling
+// 游泳距离：泳姿（HKMetadataKeySwimmingStrokeStyle）挂在它的样本上，必须一并申请读权限
+dataTypes['distance.swimming'] = 'HKQuantityTypeIdentifierDistanceSwimming';
 dataTypes['calories'] = 'HKQuantityTypeIdentifierActiveEnergyBurned'; // and HKQuantityTypeIdentifierBasalEnergyBurned
 dataTypes['calories.active'] = 'HKQuantityTypeIdentifierActiveEnergyBurned';
 dataTypes['calories.basal'] = 'HKQuantityTypeIdentifierBasalEnergyBurned';
@@ -58,6 +60,7 @@ dataTypes['UVexposure'] = 'HKQuantityTypeIdentifierUVExposure';
 var units = [];
 units['steps'] = 'count';
 units['distance'] = 'm';
+units['distance.swimming'] = 'm';
 units['calories'] = 'kcal';
 units['calories.active'] = 'kcal';
 units['calories.basal'] = 'kcal';
