@@ -30,6 +30,8 @@
   --purple:#5b4fd4;
   --line:#e7e4dc;
   --radius:18px;
+  /* 顶部安全区（状态栏高度）：默认取 env()，原生 iOS 下 env() 可能取 0，由脚本运行时兜底 */
+  --sat:env(safe-area-inset-top, 0px);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
@@ -51,7 +53,7 @@ body{
   .phone{max-width:none;height:100vh;height:100dvh;border-radius:0;box-shadow:none;}
 }
 #pages{flex:1;overflow:hidden;position:relative;}
-.page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:calc(6px + env(safe-area-inset-top,0px)) 18px 110px;display:none;scrollbar-width:none;}
+.page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:calc(6px + var(--sat)) 18px 110px;display:none;scrollbar-width:none;}
 .page::-webkit-scrollbar{display:none;}
 .tabbar{
   position:absolute;left:0;right:0;bottom:0;height:76px;z-index:50;
@@ -74,11 +76,11 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .btn-primary{width:100%;border:none;border-radius:16px;padding:16px;font-size:17px;font-weight:800;background:var(--green);color:#fff;cursor:pointer;font-family:inherit;}
 .btn-ghost{border:1.5px solid #dcd9d0;background:var(--card2);border-radius:14px;padding:12px 16px;font-size:14.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit;}
 /* 子页面 */
-.subpage{position:absolute;inset:0;background:var(--bg);z-index:60;overflow-y:auto;padding:calc(12px + env(safe-area-inset-top,0px)) 18px 110px;display:none;}
+.subpage{position:absolute;inset:0;background:var(--bg);z-index:60;overflow-y:auto;padding:calc(12px + var(--sat)) 18px 110px;display:none;}
 .subpage::-webkit-scrollbar{display:none;}
 .subpage.show{display:block;animation:slidein .25s ease;}
 @keyframes slidein{from{transform:translateX(70px);opacity:.4;}to{transform:none;opacity:1;}}
-.subhead{display:flex;align-items:center;gap:8px;padding:22px 0 8px;position:sticky;top:0;background:var(--bg);z-index:3;}
+.subhead{display:flex;align-items:center;gap:8px;padding:22px 0 8px;position:sticky;top:var(--sat);background:var(--bg);z-index:3;}
 .backbtn{width:44px;height:44px;flex:none;border:none;background:transparent;font-size:24px;color:var(--ink);cursor:pointer;font-weight:900;display:flex;align-items:center;justify-content:center;border-radius:12px;}
 .backbtn:active{background:rgba(0,0,0,.05);}
 .subhead .t{font-size:22px;font-weight:900;flex:1;text-align:center;}
@@ -198,6 +200,29 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .afx-stretch .armR{transform:rotate(-150deg)}
 @keyframes swT{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
 .afx-stretch .tG{animation:swT 2.6s ease-in-out infinite}
+/* 划船机：侧视划船动作（蹬腿→后倾→拉桨） */
+.afx .rTorso,.afx .rThigh,.afx .rShin,.afx .rUpper,.afx .rFore,.afx .rSeat,.afx .rBody,.afx .rFan{transform-box:view-box;}
+.afx .rTorso{transform-origin:99px 160.5px}
+.afx .rThigh{transform-origin:99px 160.5px}
+.afx .rShin{transform-origin:90px 181.5px}
+.afx .rUpper{transform-origin:111px 85.5px}
+.afx .rFore{transform-origin:72px 97.5px}
+.afx .rFan{transform-origin:33px 112.5px}
+@keyframes rowTorso{0%,100%{transform:rotate(-28deg)}50%{transform:rotate(12deg)}}
+@keyframes rowThigh{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-30deg)}}
+@keyframes rowShin{0%,100%{transform:rotate(0deg)}50%{transform:rotate(35deg)}}
+@keyframes rowUpper{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-55deg)}}
+@keyframes rowFore{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-15deg)}}
+@keyframes rowSlide{0%,100%{transform:translateX(0)}50%{transform:translateX(42px)}}
+@keyframes rowFan{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.afx-row .rTorso{animation:rowTorso 2.2s ease-in-out infinite}
+.afx-row .rThigh{animation:rowThigh 2.2s ease-in-out infinite}
+.afx-row .rShin{animation:rowShin 2.2s ease-in-out infinite}
+.afx-row .rUpper{animation:rowUpper 2.2s ease-in-out infinite}
+.afx-row .rFore{animation:rowFore 2.2s ease-in-out infinite}
+.afx-row .rSeat{animation:rowSlide 2.2s ease-in-out infinite}
+.afx-row .rBody{animation:rowSlide 2.2s ease-in-out infinite}
+.afx-row .rFan{animation:rowFan 1.6s linear infinite}
 /* 课表 */
 .fab{position:absolute;right:18px;bottom:96px;z-index:65;display:none;background:var(--green);color:#fff;border:none;border-radius:16px;padding:14px 22px;font-size:16px;font-weight:900;cursor:pointer;box-shadow:0 8px 22px rgba(63,125,92,.35);font-family:inherit;}
 .plansempty{text-align:center;padding:70px 20px;color:var(--muted);}
@@ -295,7 +320,7 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .metsrow .txt{flex:1;font-size:14.5px;font-weight:900;color:var(--ink);}
 .metsrow .val{font-size:14px;font-weight:800;color:var(--muted);}
 /* 训练中（Hevy 风格） */
-.wohead{display:flex;align-items:center;gap:8px;padding:14px 0 10px;position:sticky;top:0;background:var(--bg);z-index:5;}
+.wohead{display:flex;align-items:center;gap:8px;padding:14px 0 10px;position:sticky;top:var(--sat);background:var(--bg);z-index:5;}
 .wohead .t{font-size:19px;font-weight:900;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .wotimer{display:flex;align-items:center;gap:5px;background:var(--card2);border:1.5px solid #dcd9d0;border-radius:12px;padding:8px 11px;font-size:14px;font-weight:900;color:var(--green);white-space:nowrap;}
 .wocard{background:var(--card);border:1px solid #e5e2d9;border-radius:20px;padding:16px;margin-bottom:16px;}
@@ -620,7 +645,7 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
     </div>
 
     <!-- ===== 游泳 ===== -->
-    <div class="page" id="page-coach" style="padding:0 0 96px;">
+    <div class="page" id="page-coach" style="padding:calc(6px + var(--sat)) 18px 96px;">
       <h1 class="pgtitle">游泳</h1>
       <p class="pgsub">来自 Apple Health 的游泳记录与历史</p>
       <div class="card" style="margin-bottom:14px;cursor:pointer;" onclick="openSwimSync()">
@@ -807,6 +832,28 @@ const DEFAULT = {
           stepsWeek:[0,0,0,0,0,0,0],sleepWeek:[0,0,0,0,0,0,0]}
 };
 let state = load();
+
+/* ============ 顶部安全区（状态栏）兜底 ============ */
+/* Capacitor iOS 的 WKWebView 里 env(safe-area-inset-top) 有可能取到 0，
+   导致页面标题被状态栏盖住。这里运行时探测：env 失效且 WebView 确为全屏
+   （状态栏浮在内容之上）时，按机型写入 --sat。桌面浏览器不加任何偏移。 */
+(function(){
+  try{
+    var d=document.createElement('div');
+    d.style.cssText='position:fixed;left:0;top:-999px;width:1px;height:1px;padding-top:env(safe-area-inset-top,0px);';
+    document.body.appendChild(d);
+    var v=parseFloat(getComputedStyle(d).paddingTop)||0;
+    d.parentNode.removeChild(d);
+    if(v>0) return;
+    var cap=window.Capacitor;
+    if(!cap||typeof cap.getPlatform!=='function'||cap.getPlatform()!=='ios') return;
+    var sh=(window.screen&&window.screen.height)||0;
+    var ih=window.innerHeight||0;
+    /* innerHeight 与屏幕高度一致 => WebView 全屏，状态栏浮在其上 */
+    if(ih>0&&sh>0&&Math.abs(ih-sh)>2) return;
+    document.documentElement.style.setProperty('--sat',(sh>=800?50:20)+'px');
+  }catch(e){}
+})();
 
 /* ============ CloudKit 私有数据库同步（iOS 原生；不可用时自动回退本地） ============ */
 /* 同步策略：按时间戳逐字段合并 —— 每个数据块各自记录最后修改时间，
@@ -1207,7 +1254,7 @@ function animType(name){
     return 'crunch';
   }
   if(g==='有氧'){
-    if(/划船/.test(n)) return 'pullH';
+    if(/划船/.test(n)) return 'row';
     if(/跳绳|椭圆/.test(n)) return 'calf';
     return 'run';
   }
@@ -1232,6 +1279,7 @@ function animFig(name,h){
   const e=EXIDX[name];
   const t=e?animType(name):null;
   if(!t) return staticAnat(name,h);
+  if(t==='row') return rowFig(name,h);
   const side=AFX_SIDE.indexOf(t)>=0;
   const c=animColors(e);
   let s='<svg viewBox="0 0 200 260" height="'+h+'" class="afx afx-'+t+(side?' side':'')+'">';
@@ -1282,6 +1330,44 @@ function animFig(name,h){
   return s;
 }
 function exIcon(n){ return '🏋️'; }
+/* 划船机演示图：侧视划船架 + 划船者，按「蹬腿→后倾→拉桨」循环 */
+function rowFig(name,h){
+  const e=EXIDX[name]||{g:'有氧',sub:'稳态'};
+  const c=animColors(e);
+  const leg=c.leg||'#e2694f', abs=c.abs||'#d6d2c8', arm=c.arm||'#c9c4b8';
+  let s='<svg viewBox="0 0 200 260" height="'+h+'" class="afx afx-row">';
+  /* 划船机：滑轨、前支架、飞轮（风扇随划桨转动）、脚踏板 */
+  s+='<rect x="30" y="184.5" width="157.5" height="10.5" rx="5.3" fill="#d6d2c8"/>'
+    +'<rect x="27" y="109.5" width="12" height="78" rx="4.5" fill="#c9c4b8"/>'
+    +'<circle cx="33" cy="112.5" r="24" fill="#f0eee7" stroke="#d6d2c8" stroke-width="3"/>'
+    +'<g class="rFan">'
+    +'<line x1="33" y1="94.5" x2="33" y2="130.5" stroke="#b9b4a6" stroke-width="3.8" stroke-linecap="round"/>'
+    +'<line x1="18" y1="103.5" x2="48" y2="121.5" stroke="#b9b4a6" stroke-width="3.8" stroke-linecap="round"/>'
+    +'<line x1="18" y1="121.5" x2="48" y2="103.5" stroke="#b9b4a6" stroke-width="3.8" stroke-linecap="round"/>'
+    +'<circle cx="33" cy="112.5" r="4.5" fill="#8a867c"/></g>'
+    +'<rect x="45" y="196.5" width="63" height="13.5" rx="4.5" fill="#8a867c"/>'
+    +'<rect x="51" y="192" width="18" height="6" rx="3" fill="#6f6b61"/>';
+  /* 座椅（随划桨前后滑动） */
+  s+='<g class="rSeat"><rect x="87" y="171" width="48" height="15" rx="7.5" fill="#8a867c"/>'
+    +'<rect x="93" y="175.5" width="36" height="6" rx="3" fill="#6f6b61"/></g>';
+  s+='<g class="rBody">';
+  /* 腿：蹬腿（大腿绕髋、小腿绕膝） */
+  s+='<g class="rThigh"><path d="M99,160.5 L90,181.5" stroke="'+leg+'" stroke-width="19.5" fill="none" stroke-linecap="round"/>'
+    +'<g class="rShin"><path d="M90,181.5 L69,205.5" stroke="'+leg+'" stroke-width="16.5" fill="none" stroke-linecap="round"/>'
+    +'<path d="M69,205.5 L55.5,208.5" stroke="'+leg+'" stroke-width="12" fill="none" stroke-linecap="round"/></g></g>';
+  /* 躯干：绕髋后倾 / 前倾 */
+  s+='<g class="rTorso"><path d="M99,160.5 L111,85.5" stroke="#e8e4db" stroke-width="39" fill="none" stroke-linecap="round"/>'
+    +'<path d="M105,142.5 L111,97.5" stroke="'+abs+'" stroke-width="15" fill="none" stroke-linecap="round"/>'
+    +'<rect x="106.5" y="73.5" width="10.5" height="13.5" rx="4.5" fill="#e8e4db"/>'
+    +'<circle cx="117" cy="64.5" r="16.5" fill="#e8e4db"/>';
+  /* 手臂：拉桨（上臂绕肩、前臂绕肘，手柄握在手中） */
+  s+='<g class="rUpper"><path d="M111,85.5 L72,97.5" stroke="'+arm+'" stroke-width="15" fill="none" stroke-linecap="round"/>'
+    +'<g class="rFore"><path d="M72,97.5 L48,106.5" stroke="'+arm+'" stroke-width="13.5" fill="none" stroke-linecap="round"/>'
+    +'<circle cx="45" cy="107.3" r="8.3" fill="'+arm+'"/>'
+    +'<rect x="31.5" y="100.5" width="27" height="12" rx="5.3" fill="#8a867c"/></g></g>';
+  s+='</g></g></svg>';
+  return s;
+}
 
 /* ================= 新人页 ================= */
 const DB={
