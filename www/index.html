@@ -909,6 +909,12 @@ function switchTab(name){
   document.getElementById('selFab').style.display='none';
 }
 function showSub(id){
+  // 先关掉其它已打开的子页面：否则多个子页面会同时处于打开状态并互相遮挡
+  // （曾经的问题：新建课表时选动作页被「我的课表」页盖住，导致只能看到「完成（0）」而无法新建）
+  const opened=document.querySelectorAll('.subpage.show');
+  for(let i=0;i<opened.length;i++){
+    if(opened[i].id!==id) opened[i].classList.remove('show');
+  }
   document.getElementById(id).classList.add('show');
   document.getElementById(id).scrollTop=0;
   document.getElementById('planFab').style.display = (id==='sub-plans')?'block':'none';
@@ -1519,7 +1525,7 @@ function openLib(group){
   showSub('sub-lib');
 }
 function backFromLib(){
-  if(libMode==='plan'){ openPlans(); return; }
+  if(libMode==='plan'){ libMode=null; planSel=null; openPlans(); return; }
   if(libMode==='woadd'){ libMode=null; showSub('sub-wo'); renderWo(); return; }
   hideSub('sub-lib');
 }
