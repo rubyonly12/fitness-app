@@ -2713,9 +2713,18 @@ function syncSwimHealth(){
         if(v.indexOf('swimming')!==0) return;
         if(!x.id){ return; }
         if(existing[x.id]){
-          // 已同步过的旧记录：当时可能只记了通用泳姿（游泳/泳池游泳/公开水域）。
-          // 若这次 HealthKit 识别出了具体泳姿，就补写到老记录上，而不是直接跳过。
+          // 已同步过的旧记录：刷新来自 HealthKit 的稳定事实（泳池长度 / 公开水域 / 起止时间），
+          // 让旧版本构建留下的 record 在重同步后也能修正泳池长度、并具备泳姿按时间归并所需的起止时间。
           const old=existing[x.id];
+          const md2=x.metadata||{};
+          const ow2=(v==='swimming.open_water');
+          if(ow2){ old.openWater=true; }
+          else {
+            old.openWater=false;
+            if(md2['HKMetadataKeyPoolLength']){ const pl=Math.round(md2['HKMetadataKeyPoolLength']); if(pl>0) old.poolLen=pl; }
+          }
+          old.start=x.startDate; old.end=x.endDate;
+          // 若这次 HealthKit 识别出了具体泳姿，就补写到老记录上
           if(x.strokeStyle && STROKE_CN[x.strokeStyle]
              && (!old.style || old.style==='游泳' || old.style==='泳池游泳' || old.style==='公开水域')){
             old.style=STROKE_CN[x.strokeStyle];
@@ -2727,9 +2736,19 @@ function syncSwimHealth(){
         const mins=Math.max(1, Math.round((ed-sd)/60000));
         const dist=Math.round(x.distance||0);
         const kcal=Math.round(x.calories||0);
+        const openWater = (v==='swimming.open_water');
         // 优先使用 HealthKit 识别出的具体泳姿；识别不到或 other 时回退到通用标签
-        let style = v==='swimming.open_water'?'公开水域':v==='swimming.pool'?'泳池游泳':'游泳';
+        let style = openWater?'公开水域':v==='swimming.pool'?'泳池游泳':'游泳';
         if(x.strokeStyle && STROKE_CN[x.strokeStyle]) style = STROKE_CN[x.strokeStyle];
+        // 泳池长度：HealthKit 把泳池长度存在 workout 的 metadata.HKMetadataKeyPoolLength（单位米）。
+        // 读不到时泳池默认 25；公开水域没有泳池长度，记 0 作哨兵，展示时显示「公开水域」。
+        const md = x.metadata || {};
+        let poolLen = 25;
+        if(openWater){ poolLen = 0; }
+        else if(md['HKMetadataKeyPoolLength']){
+          poolLen = Math.round(md['HKMetadataKeyPoolLength']);
+          if(!(poolLen>0)) poolLen = 25;
+        }
         const rec={
           d: sd.toISOString().slice(0,10),
           style: style,
@@ -2738,7 +2757,10 @@ function syncSwimHealth(){
           kcal: kcal,
           t0: fmtHmFromDate(sd),
           t1: fmtHmFromDate(ed),
-          poolLen: 25,
+          start: x.startDate,   // 存原生 ISO(UTC) 起止时间，供泳姿按时间窗归并，避免本地/UTC 时区错位
+          end: x.endDate,
+          openWater: openWater,
+          poolLen: poolLen,
           hid: x.id,
           source: 'Health'
         };
@@ -2809,15 +2831,18 @@ function applySwimStrokeSamples(samples,S){
   let upd=0;
   S.hist.forEach(function(r){
     if(r.style && !GENERIC_STYLES[r.style]) return;   // 已有具体泳姿的不动
-    const rs=new Date(r.d+'T'+(r.t0||'18:00')+':00').getTime();
-    let re=new Date(r.d+'T'+(r.t1||'')+':00').getTime();
-    if(isNaN(re)) re=rs+ (r.mins||30)*60000;
+    if(r.openWater) return;                            // 公开水域不套用泳姿（保持「公开水域」）
+    // 优先用同步时存下的原生 ISO(UTC) 起止时间，与样本 start（同为 UTC）直接比较，避免本地时区错位导致全天/跨日游泳错配
+    let rs, re;
+    if(r.start && r.end){ rs=new Date(r.start).getTime(); re=new Date(r.end).getTime(); }
+    else { rs=new Date(r.d+'T'+(r.t0||'18:00')+':00').getTime(); re=new Date(r.d+'T'+(r.t1||'')+':00').getTime(); }
     if(isNaN(rs)) return;
+    if(isNaN(re)) re=rs+(r.mins||30)*60000;
     const tally={};
     for(let i=0;i<samples.length;i++){
       const ss=new Date(samples[i].start).getTime();
       if(isNaN(ss)) continue;
-      if(ss>=rs-6e4 && ss<=re+6e4) tally[samples[i].stroke]=(tally[samples[i].stroke]||0)+1;
+      if(ss>=rs-120000 && ss<=re+120000) tally[samples[i].stroke]=(tally[samples[i].stroke]||0)+1;
     }
     let best=null,bc=0;
     for(const k in tally){ if(tally[k]>bc){ bc=tally[k]; best=k; } }
@@ -3002,8 +3027,8 @@ function enrichSwim(r){
   if(!r.kcal) r.kcal=Math.round(r.mins*9.2);
   if(!r.pace) r.pace=+(r.mins/(r.dist/100)).toFixed(2);
   if(!r.intensity) r.intensity=swimIntensity(r);
-  if(!r.poolLen) r.poolLen=25;
-  if(!r.laps) r.laps=Math.round(r.dist/(r.poolLen||25));
+  if(!r.openWater && !r.poolLen) r.poolLen=25;
+  if(!r.laps) r.laps = r.openWater ? 0 : Math.round(r.dist/(r.poolLen||25));
   if(!r.strokes) r.strokes=Math.round(r.dist*0.33);
   if(!r.strokeFreq) r.strokeFreq=+(r.strokes/r.mins).toFixed(1);
   if(!r.avgHR) r.avgHR=Math.round(105+r.intensity*1.4);
@@ -3252,7 +3277,7 @@ function swimDetail(i){
     +'<div class="swimsect">'
     +'<h4>更多数据</h4>'
     +'<div class="swimrow"><span class="lab">泳姿</span><span class="val">'+(r.style||'游泳')+'</span></div>'
-    +'<div class="swimrow"><span class="lab">泳池长度</span><span class="val">'+(r.poolLen||25)+' 米</span></div>'
+    +'<div class="swimrow"><span class="lab">泳池长度</span><span class="val">'+(r.openWater?'公开水域':((r.poolLen||25)+' 米'))+'</span></div>'
     +'<div class="swimrow"><span class="lab">划水频率</span><span class="val">'+(r.strokeFreq||0)+' 次/分钟</span></div>'
     +'<div class="swimrow"><span class="lab">平均心率</span><span class="val">'+(r.avgHR||0)+' BPM</span></div>'
     +'<div class="swimrow"><span class="lab">最大心率</span><span class="val">'+(r.maxHR||0)+' BPM</span></div>'
