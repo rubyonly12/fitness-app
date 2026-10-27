@@ -3331,11 +3331,48 @@ function openDateRecord(dateStr, title){
       +'<div class="sd"><p class="v">'+Math.round(totalVol)+'</p><p class="u">总容量 kg</p></div>'
       +'<div class="sd"><p class="v">'+Math.round(totalMins*6.5)+'</p><p class="u">估算消耗 kcal</p></div>'
       +'</div>';
-    recs.forEach(function(r){
-      html+='<div class="planitem" style="margin-bottom:10px;"><p class="h">'+r.title+'</p><p class="b">'+r.mins+' 分钟 · '+r.exs.length+' 个动作</p></div>';
+    recs.forEach(function(r,i){
+      html+='<div class="planitem" style="margin-bottom:10px;cursor:pointer;" onclick="openWoRecordDetail(\''+dateStr+'\','+i+',\''+label+'\')">'
+        +'<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;">'
+        +'<p class="h">'+r.title+'</p><p class="b">'+r.mins+' 分钟 · '+r.exs.length+' 个动作</p></div>'
+        +'<span style="font-size:18px;font-weight:900;color:var(--muted);">›</span></div></div>';
     });
   }
   html+='<button class="btn-ghost" style="width:100%;margin-top:8px;" onclick="closeModal()">关闭</button>';
+  openModal(html);
+}
+/* 某次训练的明细：逐个动作列出完成组的重量×次数 */
+function openWoRecordDetail(dateStr, idx, label){
+  const recs=(state.woHist||[]).filter(function(r){ return r.d===dateStr; });
+  const r=recs[idx];
+  if(!r){ toast('记录不存在'); return; }
+  let html='<h3>'+(r.title||'训练记录')+'</h3>'
+    +'<p class="note" style="margin-bottom:12px;">'+dateStr+' · '+r.mins+' 分钟 · '+r.exs.length+' 个动作</p>';
+  r.exs.forEach(function(e){
+    const name=e.n||e.name||'动作';
+    const doneSets=e.sets.filter(function(s){ return s.done; });
+    let vol=0;
+    doneSets.forEach(function(s){ vol+=(parseFloat(s.kg)||0)*(parseInt(s.reps,10)||0); });
+    html+='<div class="card" style="padding:12px 14px;margin-bottom:10px;text-align:left;">'
+      +'<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:'+(doneSets.length?'6px':'0')+';">'
+      +'<p style="font-size:15px;font-weight:900;flex:1;">'+name+'</p>'
+      +'<span style="font-size:12px;font-weight:800;color:var(--muted);">'+doneSets.length+'/'+e.sets.length+' 组'
+      +(vol>0?(' · '+Math.round(vol)+' kg'):'')+'</span></div>';
+    if(doneSets.length){
+      html+='<div style="display:flex;flex-wrap:wrap;gap:6px;">'
+        +doneSets.map(function(s){
+          const kg=parseFloat(s.kg)||0, rp=parseInt(s.reps,10)||0;
+          return '<span style="font-size:12px;font-weight:800;background:var(--card2);border:1px solid #e5e2d9;border-radius:8px;padding:4px 8px;">'
+            +(kg>0?(kg+'kg'):'自重')+' × '+(rp||'-')+'</span>';
+        }).join('')
+        +'</div>';
+    } else {
+      html+='<p style="font-size:12.5px;font-weight:700;color:var(--muted);">未完成任何组</p>';
+    }
+    html+='</div>';
+  });
+  html+='<button class="btn-primary" style="margin-bottom:8px;" onclick="openDateRecord(\''+dateStr+'\',\''+(label||dateStr)+'\')">返回</button>'
+    +'<button class="btn-ghost" style="width:100%;" onclick="closeModal()">关闭</button>';
   openModal(html);
 }
 function openTodayRecord(){ openDateRecord(new Date().toISOString().slice(0,10),'今日训练记录'); }
