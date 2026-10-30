@@ -80,8 +80,8 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .subpage::-webkit-scrollbar{display:none;}
 .subpage.show{display:block;animation:slidein .25s ease;}
 @keyframes slidein{from{transform:translateX(70px);opacity:.4;}to{transform:none;opacity:1;}}
-.subhead{display:flex;align-items:center;gap:8px;padding:22px 0 8px;position:sticky;top:var(--sat);margin-top:calc(12px + var(--sat));background:var(--bg);z-index:3;}
-.backbtn{width:44px;height:44px;flex:none;border:none;background:transparent;font-size:24px;color:var(--ink);cursor:pointer;font-weight:900;display:flex;align-items:center;justify-content:center;border-radius:12px;}
+.subhead{display:flex;align-items:center;gap:8px;padding:6px 0 8px;position:sticky;top:var(--sat);margin-top:var(--sat);background:var(--bg);z-index:3;}
+.backbtn{width:44px;height:44px;flex:none;border:none;background:transparent;font-size:24px;color:var(--ink);cursor:pointer;font-weight:900;display:flex;align-items:center;justify-content:center;border-radius:12px;line-height:1;padding:0;}
 .backbtn:active{background:rgba(0,0,0,.05);}
 .subhead .t{font-size:22px;font-weight:900;flex:1;text-align:center;}
 .subhead .ph{width:44px;flex:none;}
@@ -2692,8 +2692,11 @@ function syncSwimHealth(){
   const S = swimOf();
   toast('正在同步游泳记录…');
   h.requestAuthorization({
-    // distance.swimming：泳姿/趟数数据采集在它的样本上，必须一并申请读权限；heart_rate：真实平均/最大心率
-    read:['activity','distance','calories.active','distance.swimming','heart_rate']
+    // distance.swimming：每趟距离（泳池长度）所在样本，必须申请读权限；
+    // swimming.stroke_count：官方文档说明 per-lap 泳姿同时存放在划水次数样本与 workout 的
+    //   lap event 上，因此这个类型也要授权，否则读不到泳姿；
+    // heart_rate：真实平均/最大心率
+    read:['activity','distance','calories.active','distance.swimming','swimming.stroke_count','heart_rate']
   }, function(){
     const now = new Date();
     const start = new Date(now.getTime() - 365*24*3600*1000);
@@ -2730,6 +2733,7 @@ function syncSwimHealth(){
           }
           old.start=x.startDate; old.end=x.endDate;
           // 若这次 HealthKit 识别出了具体泳姿，就补写到老记录上
+          // （这是 workout 级的众数泳姿；稍后 applySwimStrokeSamples 会用逐趟 lap 事件做更精确的覆盖）
           if(x.strokeStyle && STROKE_CN[x.strokeStyle]
              && (!old.style || old.style==='游泳' || old.style==='泳池游泳' || old.style==='公开水域')){
             old.style=STROKE_CN[x.strokeStyle];
@@ -2882,8 +2886,17 @@ function applySwimHrFromHealth(){
     if(pending<=0) finish();
   }catch(e){ console.warn('hr init', e); }
 }
-/* 把 Apple Watch 的「逐趟样本」按时间窗归并到对应记录：
-   趟数 = 样本条数（Apple Watch 每趟记一条），泳池长度 = 单趟距离的众数，泳姿 = 出现最多的泳姿 */
+/* 把 Apple Watch 的逐趟数据按时间窗归并到对应记录。
+ *
+ * 【原生返回的三路来源（src 字段）】
+ *   dist  —— distance.swimming 距离样本：每趟一条，m = 该趟距离（= 泳池长度）→ 用来算【趟数】与【泳池长度】
+ *   count —— swimmingStrokeCount 划水次数样本：每趟一条，metadata 里带泳姿
+ *   lap   —— workout 的逐趟事件(HKWorkoutEventTypeLap)：官方文档指定的泳姿存放处，最权威
+ * 三路可能对同一趟重复描述，所以：
+ *   趟数   = dist 样本条数（没有 dist 时退回 count 条数）
+ *   泳池长度 = 单趟距离的众数（dist 来源优先，其次 lap 的池长）
+ *   泳姿   = 优先用 lap 来源的众数；没有 lap 时用 count/dist 里出现最多的泳姿
+ */
 function applySwimStrokeSamples(samples,S){
   if(!samples || !samples.length) return 0;
   let upd=0;
@@ -2897,27 +2910,46 @@ function applySwimStrokeSamples(samples,S){
     if(isNaN(rs)) return;
     if(isNaN(re)) re=rs+(r.mins||30)*60000;
     const tally={}, mTally={};
-    let n=0;
+    const lapTally={};
+    let nDist=0, nCount=0;
     for(let i=0;i<samples.length;i++){
       const ss=new Date(samples[i].start).getTime();
       if(isNaN(ss)) continue;
       if(ss>=rs-120000 && ss<=re+120000){
-        n++;
-        if(samples[i].stroke) tally[samples[i].stroke]=(tally[samples[i].stroke]||0)+1;
-        const m=parseFloat(samples[i].m);
-        if(m>0) mTally[m]=(mTally[m]||0)+1;
+        const src=samples[i].src||'dist';
+        if(src==='lap'){
+          // 官方 lap 事件：泳姿最权威
+          if(samples[i].stroke) lapTally[samples[i].stroke]=(lapTally[samples[i].stroke]||0)+1;
+          const lm=parseFloat(samples[i].m);
+          if(lm>0) mTally[lm]=(mTally[lm]||0)+1;
+        } else if(src==='count'){
+          nCount++;
+          if(samples[i].stroke) tally[samples[i].stroke]=(tally[samples[i].stroke]||0)+1;
+        } else {
+          nDist++;
+          if(samples[i].stroke) tally[samples[i].stroke]=(tally[samples[i].stroke]||0)+1;
+          const m=parseFloat(samples[i].m);
+          if(m>0) mTally[m]=(mTally[m]||0)+1;
+        }
       }
     }
-    if(!n) return;
+    // 趟数：优先距离样本条数（Apple Watch 逐趟记录），无则用划水次数样本条数
+    const n = nDist>0 ? nDist : nCount;
+    if(!n && !Object.keys(lapTally).length) return;
     // 趟数 = 落在本次训练时间窗内的样本条数（之前用 距离÷泳池长度 估算，泳池长度错则趟数跟着错）
-    if(r.laps!==n){ r.laps=n; upd++; }
+    if(n>0 && r.laps!==n){ r.laps=n; upd++; }
     // 泳池长度 = 出现最多的单趟距离（比 workout metadata 更接近真实记法）
     let bestM=0,bestMc=0;
     for(const m in mTally){ if(mTally[m]>bestMc){ bestMc=mTally[m]; bestM=parseFloat(m); } }
     if(bestM>0 && r.poolLen!==Math.round(bestM)){ r.poolLen=Math.round(bestM); upd++; }
-    // 泳姿 = 出现最多的泳姿
+    // 泳姿 = 出现最多的泳姿：lap 事件（官方）优先，其次 count / dist 样本
     let best=null,bc=0;
-    for(const k in tally){ if(tally[k]>bc){ bc=tally[k]; best=k; } }
+    const lapKeys=Object.keys(lapTally);
+    if(lapKeys.length){
+      for(const k of lapKeys){ if(lapTally[k]>bc){ bc=lapTally[k]; best=k; } }
+    } else {
+      for(const k in tally){ if(tally[k]>bc){ bc=tally[k]; best=k; } }
+    }
     if(best && STROKE_CN[best] && r.style!==STROKE_CN[best]){ r.style=STROKE_CN[best]; upd++; }
   });
   if(upd>0){ save(); renderSwim(); toast('已按 Apple Watch 逐趟数据修正泳姿 / 趟数 / 泳池长度 ✅'); }
