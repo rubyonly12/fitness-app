@@ -7,8 +7,11 @@ dataTypes['mindfulness'] = 'HKCategoryTypeIdentifierMindfulSession';
 dataTypes['steps'] = 'HKQuantityTypeIdentifierStepCount';
 dataTypes['stairs'] = 'HKQuantityTypeIdentifierFlightsClimbed';
 dataTypes['distance'] = 'HKQuantityTypeIdentifierDistanceWalkingRunning'; // and HKQuantityTypeIdentifierDistanceCycling
-// 游泳距离：泳姿（HKMetadataKeySwimmingStrokeStyle）挂在它的样本上，必须一并申请读权限
+// 游泳距离：泳池长度（每趟距离）记录在它的样本上，必须一并申请读权限
 dataTypes['distance.swimming'] = 'HKQuantityTypeIdentifierDistanceSwimming';
+// 游泳划水次数：Apple 官方文档说明 per-lap 泳姿（HKMetadataKeySwimmingStrokeStyle）
+// 同时存放在 stroke count 样本与 workout 的 lap event 上，故需读权限
+dataTypes['swimming.stroke_count'] = 'HKQuantityTypeIdentifierSwimmingStrokeCount';
 dataTypes['calories'] = 'HKQuantityTypeIdentifierActiveEnergyBurned'; // and HKQuantityTypeIdentifierBasalEnergyBurned
 dataTypes['calories.active'] = 'HKQuantityTypeIdentifierActiveEnergyBurned';
 dataTypes['calories.basal'] = 'HKQuantityTypeIdentifierBasalEnergyBurned';
