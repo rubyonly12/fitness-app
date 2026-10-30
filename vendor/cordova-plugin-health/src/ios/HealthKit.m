@@ -901,18 +901,39 @@ static NSString *const HKPluginKeyUUID = @"UUID";
 
                         // 游泳专属真实数据：总划水次数、泳池长度（metadata）、泳池/公开水域
                         if(workout.workoutActivityType == HKWorkoutActivityTypeSwimming) {
-                            if (workout.totalSwimmingStrokeCount > 0) {
-                                entry[@"swimStrokes"] = @(workout.totalSwimmingStrokeCount);
+                            // 总划水次数：totalSwimmingStrokeCount 自 iOS 17 起返回 HKQuantity* 且已废弃，
+                            // 改用 statisticsForType: 取总和（iOS 10+ 就有，跨版本稳定）。
+                            HKQuantityType *strokeCountType = [HKObjectType quantityTypeForIdentifier:HKQuantityTypeIdentifierSwimmingStrokeCount];
+                            if (strokeCountType) {
+                                HKStatistics *strokeStats = [workout statisticsForType:strokeCountType];
+                                HKQuantity *strokeSum = strokeStats ? [strokeStats sumQuantity] : nil;
+                                if (strokeSum) {
+                                    double strokes = [strokeSum doubleValueForUnit:[HKUnit countUnit]];
+                                    if (strokes > 0) entry[@"swimStrokes"] = @(strokes);
+                                }
                             }
-                            double poolLen = [workout.metadata[HKMetadataKeyPoolLength] doubleValue];
+                            // 泳池长度：metadata[HKMetadataKeyLapLength] 是 HKQuantity（长度单位），
+                            // 统一换算成米（Apple Watch 可能以码记录）。
+                            id lapValue = workout.metadata[HKMetadataKeyLapLength];
+                            double poolLen = 0;
+                            if ([lapValue isKindOfClass:[HKQuantity class]]) {
+                                poolLen = [(HKQuantity *)lapValue doubleValueForUnit:[HKUnit meterUnit]];
+                            } else if ([lapValue isKindOfClass:[NSNumber class]]) {
+                                poolLen = [(NSNumber *)lapValue doubleValue];
+                            }
                             if (poolLen > 0) {
                                 entry[@"poolLen"] = @(poolLen);
                             }
-                            if ([workout respondsToSelector:@selector(workoutConfiguration)]) {
-                                HKSwimmingLocationType loc = workout.workoutConfiguration.swimmingLocationType;
-                                if (loc == HKSwimmingLocationTypePool) entry[@"locationType"] = @"pool";
-                                else if (loc == HKSwimmingLocationTypeOpenWater) entry[@"locationType"] = @"open_water";
+                            // 泳池 / 公开水域：metadata[HKMetadataKeySwimmingLocationType] 是 NSNumber，
+                            // 取值同 HKWorkoutSwimmingLocationType：0=未知 1=泳池 2=公开水域。
+                            // （HKWorkout 上的 workoutConfiguration 属性自 iOS 17 起已被移除，只能走 metadata。）
+                            id locValue = workout.metadata[HKMetadataKeySwimmingLocationType];
+                            NSInteger loc = -1;
+                            if ([locValue isKindOfClass:[NSNumber class]]) {
+                                loc = [(NSNumber *)locValue integerValue];
                             }
+                            if (loc == 1) entry[@"locationType"] = @"pool";
+                            else if (loc == 2) entry[@"locationType"] = @"open_water";
                         }
 
                         [finalResults addObject:entry];
@@ -2130,10 +2151,17 @@ static NSString *const HKPluginKeyUUID = @"UUID";
                 resultsHandler:^(HKSampleQuery *query, NSArray *samples, NSError *innerError) {
             if (!innerError) {
                 for (HKQuantitySample *sample in samples) {
-                    NSNumber *st = sample.metadata[@"HKMetadataKeySwimmingStrokeStyle"];
+                    NSDictionary *sampleMeta = sample.metadata;
+                    NSNumber *st = sampleMeta ? sampleMeta[@"HKMetadataKeySwimmingStrokeStyle"] : nil;
                     NSInteger v = st ? [st integerValue] : 0;
                     // 每条样本 = 一趟：距离即泳池长度（Apple Watch 逐趟记录）
                     double lapMeters = [sample.quantity doubleValueForUnit:[HKUnit meterUnit]];
+                    // 逐趟样本上通常也带 lapLength（可能以码记录），有则以它为准
+                    id lapValue = sampleMeta ? sampleMeta[HKMetadataKeyLapLength] : nil;
+                    if ([lapValue isKindOfClass:[HKQuantity class]]) {
+                        double lm = [(HKQuantity *)lapValue doubleValueForUnit:[HKUnit meterUnit]];
+                        if (lm > 0) lapMeters = lm;
+                    }
                     if (lapMeters <= 0 && v == 0) continue;
                     NSString *stroke = nil;
                     switch (v) {
