@@ -96,24 +96,48 @@ function api(method, p, body) {
       return;
     }
   } else {
-    console.log('本地无远程 base 对象，退化为「整树单提交」模式');
-    commitMsg = 'chore: sync local working tree';
-    commitBody = '通过 GitHub API 推送本地工作树快照。';
+    // 远程 base 对象不在本地（历史提交都走 API 推的）→ 无法用 baseSha..HEAD 求差集，
+    // 改为「本地领先远程的提交」：本地历史里 baseSha 之后的提交。
+    // 用 git log --all 找出远程 baseSha 之后、本地新增的提交；找不到就退回最近一条提交。
+    console.log('本地无远程 base 对象，改用「本地最近提交」模式');
+    const raw = git(['log', '-1', '--format=%H%x1f%s%x1f%b', 'HEAD']).trim();
+    const [sha, subj, body] = raw.split('\x1f');
+    commitMsg = subj || 'chore: sync local working tree';
+    commitBody = (body || '') + '\n\n（本提交通过 GitHub REST API 推送，远程 base 对象未存在于本地）';
+    console.log('待推送提交：' + sha.slice(0, 12) + ' ' + subj);
   }
 
   // 3. 增量 tree：base_tree 继承远程全部文件，只把「本次改动的文件」写进去。
   //    这样无需上传历史遗留的 blob（本地旧 blob 远程不存在，会被 API 拒绝）。
-  const diff = git(['diff', '--name-status', baseSha + '..HEAD']).trim();
-  const changed = diff ? diff.split('\n').filter(Boolean).map(l => {
-    const p = l.split('\t');
-    return { status: p[0], path: p[p.length - 1] };
-  }) : [];
-  console.log('本次改动文件数：' + changed.length);
-
-  // 远程已存在的 blob 集合（用于判断哪些需要上传）
-  const remoteBlobs = new Set();
+  //
+  //    注意：远程 base commit 可能不在本地对象库里（历史提交都是走 API 推的，
+  //    本地没有对应对象），此时 `git diff baseSha..HEAD` 会报 Invalid revision range。
+  //    因此这里不依赖 base 对象，改用「远程 tree 内容 vs 本地 HEAD 内容」做对比。
+  const remoteTreeMap = new Map();   // path -> sha
   const sub = api('GET', '/repos/' + REPO + '/git/trees/' + baseTreeSha + '?recursive=1');
-  (sub.tree || []).forEach(t => { if (t.type === 'blob') remoteBlobs.add(t.sha); });
+  (sub.tree || []).forEach(t => {
+    if (t.type === 'blob') remoteTreeMap.set(t.path, t.sha);
+  });
+  const remoteBlobs = new Set(remoteTreeMap.values());
+
+  // 本地 HEAD 的全部 blob
+  const localTree = {};
+  git(['ls-tree', '-r', 'HEAD']).split('\n').filter(Boolean).forEach(line => {
+    const meta = line.split(/\s+/);
+    localTree[meta[3]] = { mode: meta[0], type: meta[1], sha: meta[2] };
+  });
+
+  // 对比：本地有、远程没有/不同 → 需要上传；本地没有、远程有 → 需要删除
+  const changed = [];
+  for (const p of Object.keys(localTree)) {
+    const l = localTree[p];
+    const r = remoteTreeMap.get(p);
+    if (r !== l.sha) changed.push({ status: r ? 'M' : 'A', path: p, local: l });
+  }
+  for (const p of remoteTreeMap.keys()) {
+    if (!(p in localTree)) changed.push({ status: 'D', path: p });
+  }
+  console.log('本次改动文件数：' + changed.length);
 
   const treeItems = [];
   let uploaded = 0;
@@ -121,12 +145,10 @@ function api(method, p, body) {
     // 删除的文件
     if (ch.status === 'D') {
       treeItems.push({ path: ch.path, mode: '100644', type: 'blob', sha: '0000000000000000000000000000000000000000' });
+      console.log('  × 删除 ' + ch.path);
       continue;
     }
-    const entry = git(['ls-tree', 'HEAD', '--', ch.path]).trim();
-    if (!entry) { console.log('  跳过（本地已不存在）：' + ch.path); continue; }
-    const meta = entry.split(/\s+/);
-    const mode = meta[0], type = meta[1], sha = meta[2];
+    const mode = ch.local.mode, type = ch.local.type, sha = ch.local.sha;
     if (!remoteBlobs.has(sha)) {
       const content = git(['cat-file', 'blob', sha]);
       const up = api('POST', '/repos/' + REPO + '/git/blobs', {
