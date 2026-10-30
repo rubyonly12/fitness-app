@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = process.cwd();
-const PROXY = 'http://127.0.0.1:3388';
+const PROXY = process.env.HTTPS_PROXY || process.env.https_proxy || 'http://127.0.0.1:3388';
 const REPO = 'rubyonly12/fitness-app';
 const API = 'https://api.github.com';
 const BRANCH = 'main';

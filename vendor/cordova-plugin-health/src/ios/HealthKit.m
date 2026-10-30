@@ -2301,11 +2301,17 @@ static NSString *const HKPluginKeyUUID = @"UUID";
         }
 
         // ---- ③ workout 的逐趟事件（官方文档指定的泳姿存放处）----
-        HKQuery *wq = [HKQuery queryForWorkoutsWithActivityType:HKWorkoutActivityTypeSwimming
-                                                     predicate:[HKQuery predicateForSamplesWithStartDate:startDate endDate:endDate options:HKQueryOptionStrictStartDate]
-                                                         limit:HKObjectQueryNoLimit
-                                                   sortDescriptors:nil
-                                                    resultsHandler:^(HKQuery *query, NSArray *results, NSError *err) {
+        // 用 HKSampleQuery + workoutType 查询（与本插件 findWorkouts 一致），
+        // predicate 用 predicateForWorkoutsWithWorkoutActivityType: 再与时间窗求交集。
+        NSPredicate *actPredicate = [HKQuery predicateForWorkoutsWithWorkoutActivityType:HKWorkoutActivityTypeSwimming];
+        NSPredicate *datePredicate = [HKQuery predicateForSamplesWithStartDate:startDate endDate:endDate options:HKQueryOptionStrictStartDate];
+        NSPredicate *workoutPredicate = [NSCompoundPredicate andPredicateWithSubpredicates:@[actPredicate, datePredicate]];
+        HKSampleQuery *wq = [[HKSampleQuery alloc]
+            initWithSampleType:[HKWorkoutType workoutType]
+                     predicate:workoutPredicate
+                         limit:HKObjectQueryNoLimit
+               sortDescriptors:nil
+                resultsHandler:^(HKSampleQuery *query, NSArray *results, NSError *err) {
             if (!err && results) {
                 for (HKWorkout *w in results) {
                     NSArray<HKWorkoutEvent *> *events = w.workoutEvents;
@@ -2322,9 +2328,12 @@ static NSString *const HKPluginKeyUUID = @"UUID";
                         if (ev.type != HKWorkoutEventTypeLap) continue;
                         NSString *stroke = strokeFromMeta(ev.metadata);
                         if (!stroke.length) continue;
+                        // NSDateInterval 用 startDate / endDate（不是 start / end）
+                        NSDate *evStart = ev.dateInterval.startDate;
+                        NSDate *evEnd = ev.dateInterval.endDate;
                         [out addObject:@{
-                            @"start": [HealthKit stringFromDate:ev.dateInterval.start],
-                            @"end": [HealthKit stringFromDate:ev.dateInterval.end],
+                            @"start": [HealthKit stringFromDate:evStart],
+                            @"end": [HealthKit stringFromDate:evEnd],
                             @"stroke": stroke,
                             @"m": @(poolMeters),
                             @"src": @"lap"

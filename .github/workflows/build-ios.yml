@@ -24,6 +24,11 @@ jobs:
       - name: Apply cordova-plugin-health swim-stroke patch
         run: node scripts/sync-health-patch.js
 
+      - name: Verify native HealthKit API usage
+        # 编译前的静态预检：拦截 HealthKit API 误用（NSDateInterval 属性名、
+        # HKQuery 类方法当实例方法用、已移除的枚举等），避免白等一次 Xcode 编译。
+        run: node scripts/check-native-api.js
+
       - name: Sync Capacitor iOS
         run: npx cap sync ios
 
