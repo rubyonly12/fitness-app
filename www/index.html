@@ -2692,8 +2692,8 @@ function syncSwimHealth(){
   const S = swimOf();
   toast('正在同步游泳记录…');
   h.requestAuthorization({
-    // distance.swimming：泳姿数据采集在它的样本上，必须一并申请读权限
-    read:['activity','distance','calories.active','distance.swimming']
+    // distance.swimming：泳姿/趟数数据采集在它的样本上，必须一并申请读权限；heart_rate：真实平均/最大心率
+    read:['activity','distance','calories.active','distance.swimming','heart_rate']
   }, function(){
     const now = new Date();
     const start = new Date(now.getTime() - 365*24*3600*1000);
@@ -2721,7 +2721,12 @@ function syncSwimHealth(){
           if(ow2){ old.openWater=true; }
           else {
             old.openWater=false;
-            if(md2['HKMetadataKeyPoolLength']){ const pl=Math.round(md2['HKMetadataKeyPoolLength']); if(pl>0) old.poolLen=pl; }
+            if(x.poolLen>0){ old.poolLen=Math.round(x.poolLen); }
+            else if(md2['HKMetadataKeyPoolLength']){ const pl=Math.round(md2['HKMetadataKeyPoolLength']); if(pl>0) old.poolLen=pl; }
+          }
+          if(x.swimStrokes>0){
+            old.strokes=Math.round(x.swimStrokes);
+            old.strokeFreq=+(old.strokes/Math.max(1,old.mins)).toFixed(1);
           }
           old.start=x.startDate; old.end=x.endDate;
           // 若这次 HealthKit 识别出了具体泳姿，就补写到老记录上
@@ -2736,15 +2741,16 @@ function syncSwimHealth(){
         const mins=Math.max(1, Math.round((ed-sd)/60000));
         const dist=Math.round(x.distance||0);
         const kcal=Math.round(x.calories||0);
-        const openWater = (v==='swimming.open_water');
+        const openWater = (v==='swimming.open_water' || x.locationType==='open_water');
         // 优先使用 HealthKit 识别出的具体泳姿；识别不到或 other 时回退到通用标签
-        let style = openWater?'公开水域':v==='swimming.pool'?'泳池游泳':'游泳';
+        let style = openWater?'公开水域':(v==='swimming.pool'||x.locationType==='pool')?'泳池游泳':'游泳';
         if(x.strokeStyle && STROKE_CN[x.strokeStyle]) style = STROKE_CN[x.strokeStyle];
-        // 泳池长度：HealthKit 把泳池长度存在 workout 的 metadata.HKMetadataKeyPoolLength（单位米）。
-        // 读不到时泳池默认 25；公开水域没有泳池长度，记 0 作哨兵，展示时显示「公开水域」。
+        // 泳池长度：原生直接从 workout metadata 读 HKMetadataKeyPoolLength（x.poolLen，米）。
+        // 读不到时泳池默认 25（逐趟样本同步后还会用真实单趟距离覆盖）；公开水域记 0 作哨兵。
         const md = x.metadata || {};
         let poolLen = 25;
         if(openWater){ poolLen = 0; }
+        else if(x.poolLen && x.poolLen>0){ poolLen = Math.round(x.poolLen); }
         else if(md['HKMetadataKeyPoolLength']){
           poolLen = Math.round(md['HKMetadataKeyPoolLength']);
           if(!(poolLen>0)) poolLen = 25;
@@ -2757,13 +2763,14 @@ function syncSwimHealth(){
           kcal: kcal,
           t0: fmtHmFromDate(sd),
           t1: fmtHmFromDate(ed),
-          start: x.startDate,   // 存原生 ISO(UTC) 起止时间，供泳姿按时间窗归并，避免本地/UTC 时区错位
+          start: x.startDate,   // 存原生 ISO(UTC) 起止时间，供泳姿/趟数按时间窗归并，避免本地/UTC 时区错位
           end: x.endDate,
           openWater: openWater,
           poolLen: poolLen,
           hid: x.id,
           source: 'Health'
         };
+        if(x.swimStrokes>0) rec.strokes=Math.round(x.swimStrokes);  // 真实总划水次数（HKWorkout）
         enrichSwim(rec);
         S.hist.push(rec);
         existing[x.id]=true;
@@ -2823,32 +2830,102 @@ function enrichSwimStylesFromHealth(){
     setTimeout(function(){ finish([], false); }, 8000);
     cordova.exec(function(arr){ finish(arr, true); }, function(){ finish([], false); },
       'HealthKit', 'readSwimStrokeStyles', [{startDate:start, endDate:end}]);
+    // 真实平均/最大心率（独立于泳姿归并，失败不影响主流程）
+    applySwimHrFromHealth();
   }catch(e){ console.warn('stroke init', e); }
 }
-/* 把样本按「是否落在该条记录的时间窗内」归并，取出现最多的泳姿覆盖通用标签 */
+/* 用 HealthKit 心率样本计算每次游泳的真实平均/最大心率（此前是按强度估算的假值）
+   注意：原生 querySampleType 默认 limit=1000 且按 endDate 降序返回，
+   如果把「所有游泳」合成一个大时间窗去查，早期的心率样本会被 limit 截掉。
+   因此这里对每条记录单独查询它自己的时间窗，互不干扰，也天然避开截断。 */
+function applySwimHrFromHealth(){
+  try{
+    if(typeof cordova==='undefined' || !cordova.plugins || !cordova.plugins.health) return;
+    const h=cordova.plugins.health;
+    const S=swimOf();
+    const targets=S.hist.filter(function(r){ return r.hid && r.start && r.end; });
+    if(!targets.length) return;
+    let pending=0, upd=0, done=false;
+    const finish=function(){
+      if(done) return; done=true;
+      try{ if(upd>0){ save(); renderSwim(); } }catch(e){ console.warn('hr save', e); }
+    };
+    targets.forEach(function(r){
+      const rs=new Date(r.start).getTime(), re=new Date(r.end).getTime();
+      if(isNaN(rs)||isNaN(re)||re<=rs) return;
+      pending++;
+      // 前后各放宽 1 分钟，容忍 Apple Watch 心率采样点略微落在训练区间之外
+      h.query({startDate:new Date(rs-60000), endDate:new Date(re+60000),
+               dataType:'heart_rate', unit:'bpm', limit:2000}, function(arr){
+        try{
+          let sum=0,cnt=0,mx=0;
+          (arr||[]).forEach(function(s){
+            const t=new Date(s.startDate||s.start).getTime();
+            if(isNaN(t)||t<rs||t>re) return;      // 只认落在本次训练区间内的样本
+            const v=parseFloat(s.quantity!=null?s.quantity:s.value);
+            if(!(v>0)) return;
+            sum+=v; cnt++; if(v>mx) mx=v;
+          });
+          if(cnt){
+            const avg=Math.round(sum/cnt);
+            const maxV=Math.max(mx,avg);
+            if(r.avgHR!==avg || r.maxHR!==maxV){
+              r.avgHR=avg; r.maxHR=maxV;
+              r.hrMin=Math.round(avg-16);
+              r.hrZones=genHrZones(r.mins,r.avgHR,r.maxHR);
+              r.hrCurve=genHrCurve(r.t0||'18:00',r.mins,r.avgHR,r.maxHR,r.hrMin);
+              upd++;
+            }
+          }
+        }catch(e){ console.warn('hr calc', e); }
+        if(--pending<=0) finish();
+      }, function(e){
+        console.warn('hr query', e);
+        if(--pending<=0) finish();
+      });
+    });
+    if(pending<=0) finish();
+  }catch(e){ console.warn('hr init', e); }
+}
+/* 把 Apple Watch 的「逐趟样本」按时间窗归并到对应记录：
+   趟数 = 样本条数（Apple Watch 每趟记一条），泳池长度 = 单趟距离的众数，泳姿 = 出现最多的泳姿 */
 function applySwimStrokeSamples(samples,S){
   if(!samples || !samples.length) return 0;
   let upd=0;
   S.hist.forEach(function(r){
-    if(r.style && !GENERIC_STYLES[r.style]) return;   // 已有具体泳姿的不动
-    if(r.openWater) return;                            // 公开水域不套用泳姿（保持「公开水域」）
+    if(!r.hid) return;                                 // 只修正来自 Health 同步的记录，不动手动记录
+    if(r.openWater) return;                            // 公开水域不套用泳姿/趟数（保持「公开水域」）
     // 优先用同步时存下的原生 ISO(UTC) 起止时间，与样本 start（同为 UTC）直接比较，避免本地时区错位导致全天/跨日游泳错配
     let rs, re;
     if(r.start && r.end){ rs=new Date(r.start).getTime(); re=new Date(r.end).getTime(); }
     else { rs=new Date(r.d+'T'+(r.t0||'18:00')+':00').getTime(); re=new Date(r.d+'T'+(r.t1||'')+':00').getTime(); }
     if(isNaN(rs)) return;
     if(isNaN(re)) re=rs+(r.mins||30)*60000;
-    const tally={};
+    const tally={}, mTally={};
+    let n=0;
     for(let i=0;i<samples.length;i++){
       const ss=new Date(samples[i].start).getTime();
       if(isNaN(ss)) continue;
-      if(ss>=rs-120000 && ss<=re+120000) tally[samples[i].stroke]=(tally[samples[i].stroke]||0)+1;
+      if(ss>=rs-120000 && ss<=re+120000){
+        n++;
+        if(samples[i].stroke) tally[samples[i].stroke]=(tally[samples[i].stroke]||0)+1;
+        const m=parseFloat(samples[i].m);
+        if(m>0) mTally[m]=(mTally[m]||0)+1;
+      }
     }
+    if(!n) return;
+    // 趟数 = 落在本次训练时间窗内的样本条数（之前用 距离÷泳池长度 估算，泳池长度错则趟数跟着错）
+    if(r.laps!==n){ r.laps=n; upd++; }
+    // 泳池长度 = 出现最多的单趟距离（比 workout metadata 更接近真实记法）
+    let bestM=0,bestMc=0;
+    for(const m in mTally){ if(mTally[m]>bestMc){ bestMc=mTally[m]; bestM=parseFloat(m); } }
+    if(bestM>0 && r.poolLen!==Math.round(bestM)){ r.poolLen=Math.round(bestM); upd++; }
+    // 泳姿 = 出现最多的泳姿
     let best=null,bc=0;
     for(const k in tally){ if(tally[k]>bc){ bc=tally[k]; best=k; } }
-    if(best && STROKE_CN[best]){ r.style=STROKE_CN[best]; upd++; }
+    if(best && STROKE_CN[best] && r.style!==STROKE_CN[best]){ r.style=STROKE_CN[best]; upd++; }
   });
-  if(upd>0){ save(); renderSwim(); toast('已按 iPhone 数据补全 '+upd+' 条泳姿 ✅'); }
+  if(upd>0){ save(); renderSwim(); toast('已按 Apple Watch 逐趟数据修正泳姿 / 趟数 / 泳池长度 ✅'); }
   return upd;
 }
 function openHealthSync(){
