@@ -2716,13 +2716,13 @@ function syncSwimHealth(){
           // 已同步过的旧记录：刷新来自 HealthKit 的稳定事实（泳池长度 / 公开水域 / 起止时间），
           // 让旧版本构建留下的 record 在重同步后也能修正泳池长度、并具备泳姿按时间归并所需的起止时间。
           const old=existing[x.id];
-          const md2=x.metadata||{};
-          const ow2=(v==='swimming.open_water');
+          // 公开水域判定：原生 activityType 只回传 "swimming"，不带 .open_water 后缀，
+          // 所以以原生直读的 locationType（open_water/pool）为准。
+          const ow2=(v==='swimming.open_water' || x.locationType==='open_water');
           if(ow2){ old.openWater=true; }
           else {
             old.openWater=false;
             if(x.poolLen>0){ old.poolLen=Math.round(x.poolLen); }
-            else if(md2['HKMetadataKeyPoolLength']){ const pl=Math.round(md2['HKMetadataKeyPoolLength']); if(pl>0) old.poolLen=pl; }
           }
           if(x.swimStrokes>0){
             old.strokes=Math.round(x.swimStrokes);
@@ -2745,16 +2745,11 @@ function syncSwimHealth(){
         // 优先使用 HealthKit 识别出的具体泳姿；识别不到或 other 时回退到通用标签
         let style = openWater?'公开水域':(v==='swimming.pool'||x.locationType==='pool')?'泳池游泳':'游泳';
         if(x.strokeStyle && STROKE_CN[x.strokeStyle]) style = STROKE_CN[x.strokeStyle];
-        // 泳池长度：原生直接从 workout metadata 读 HKMetadataKeyPoolLength（x.poolLen，米）。
+        // 泳池长度：原生直接从 workout metadata 读 HKMetadataKeyLapLength（x.poolLen，已换算成米）。
         // 读不到时泳池默认 25（逐趟样本同步后还会用真实单趟距离覆盖）；公开水域记 0 作哨兵。
-        const md = x.metadata || {};
         let poolLen = 25;
         if(openWater){ poolLen = 0; }
         else if(x.poolLen && x.poolLen>0){ poolLen = Math.round(x.poolLen); }
-        else if(md['HKMetadataKeyPoolLength']){
-          poolLen = Math.round(md['HKMetadataKeyPoolLength']);
-          if(!(poolLen>0)) poolLen = 25;
-        }
         const rec={
           d: sd.toISOString().slice(0,10),
           style: style,

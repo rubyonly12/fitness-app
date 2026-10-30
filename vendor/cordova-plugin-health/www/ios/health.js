@@ -283,7 +283,7 @@ Health.prototype.query = function (opts, onSuccess, onError) {
           // 原生插件在 iOS 17+ 会回传 HealthKit 识别的泳姿（breaststroke/freestyle/…）
           if (data[i].strokeStyle) res.strokeStyle = data[i].strokeStyle;
           // 游泳专属真实数据（由 vendor 补丁在原生层直接读取 HealthKit）：
-          //   poolLen     —— workout metadata 里的 HKMetadataKeyPoolLength（泳池长度，米）
+          //   poolLen     —— workout metadata 里的 HKMetadataKeyLapLength（泳池/单趟长度，已换算成米）
           //   locationType—— pool / open_water（泳池 or 公开水域）
           //   swimStrokes —— totalSwimmingStrokeCount（总划水次数）
           // 这三个字段不进白名单就会在上层被丢掉，必须显式透传。
