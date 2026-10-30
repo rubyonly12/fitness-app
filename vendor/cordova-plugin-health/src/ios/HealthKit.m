@@ -899,6 +899,22 @@ static NSString *const HKPluginKeyUUID = @"UUID";
                             entry[@"distance"] = metersString;
                         }
 
+                        // 游泳专属真实数据：总划水次数、泳池长度（metadata）、泳池/公开水域
+                        if(workout.workoutActivityType == HKWorkoutActivityTypeSwimming) {
+                            if (workout.totalSwimmingStrokeCount > 0) {
+                                entry[@"swimStrokes"] = @(workout.totalSwimmingStrokeCount);
+                            }
+                            double poolLen = [workout.metadata[HKMetadataKeyPoolLength] doubleValue];
+                            if (poolLen > 0) {
+                                entry[@"poolLen"] = @(poolLen);
+                            }
+                            if ([workout respondsToSelector:@selector(workoutConfiguration)]) {
+                                HKSwimmingLocationType loc = workout.workoutConfiguration.swimmingLocationType;
+                                if (loc == HKSwimmingLocationTypePool) entry[@"locationType"] = @"pool";
+                                else if (loc == HKSwimmingLocationTypeOpenWater) entry[@"locationType"] = @"open_water";
+                            }
+                        }
+
                         [finalResults addObject:entry];
                     }
 
@@ -2086,7 +2102,8 @@ static NSString *const HKPluginKeyUUID = @"UUID";
  * 绝不走 error 分支，避免影响调用方（游泳记录同步）的主流程。
  *
  * 入参：startDate / endDate（毫秒时间戳）
- * 返回：[{start: ISO, end: ISO, stroke: "breaststroke"|...}, ...]
+ * 返回：[{start: ISO, end: ISO, stroke: "breaststroke"|""（未知）, m: 该趟距离（米）}, ...]
+ *       每条样本即一趟；m 为样本距离（= 泳池长度），样本条数即趟数。
  */
 - (void)readSwimStrokeStyles:(CDVInvokedUrlCommand *)command {
     NSDictionary *args = [command.arguments objectAtIndex:0];
@@ -2114,8 +2131,10 @@ static NSString *const HKPluginKeyUUID = @"UUID";
             if (!innerError) {
                 for (HKQuantitySample *sample in samples) {
                     NSNumber *st = sample.metadata[@"HKMetadataKeySwimmingStrokeStyle"];
-                    if (!st) continue;
-                    NSInteger v = [st integerValue];
+                    NSInteger v = st ? [st integerValue] : 0;
+                    // 每条样本 = 一趟：距离即泳池长度（Apple Watch 逐趟记录）
+                    double lapMeters = [sample.quantity doubleValueForUnit:[HKUnit meterUnit]];
+                    if (lapMeters <= 0 && v == 0) continue;
                     NSString *stroke = nil;
                     switch (v) {
                         case 1: stroke = @"mixed"; break;
@@ -2126,11 +2145,11 @@ static NSString *const HKPluginKeyUUID = @"UUID";
                         case 6: stroke = @"kickboard"; break;
                         default: stroke = nil; break;
                     }
-                    if (!stroke) continue;
                     [out addObject:@{
                         @"start": [HealthKit stringFromDate:sample.startDate],
                         @"end": [HealthKit stringFromDate:sample.endDate],
-                        @"stroke": stroke
+                        @"stroke": stroke ?: @"",
+                        @"m": @(lapMeters)
                     }];
                 }
             }
