@@ -3127,9 +3127,13 @@ function genHrCurve(t0,mins,avg,max,min){
   for(let i=0;i<=mins;i+=step){
     const t=fmtHm(base+i);
     const phase=i/mins;
-    let hr=avg+Math.sin(phase*Math.PI*3)*6+Math.cos(phase*Math.PI*2)*4;
+    let hr=avg+Math.sin(phase*Math.PI*3)*5+Math.cos(phase*Math.PI*2)*3;
     if(i<5) hr=min+(avg-min)*(i/5);
     if(i>mins-5) hr=avg+(max-avg)*((i-(mins-5))/5);
+    // 真实心率细节：确定性的逐点微波动，使线条呈现真实起伏而非平滑曲线
+    const jit=Math.sin(i*1.7)*2.2+Math.sin(i*4.3+0.7)*1.4;
+    const h=Math.sin(i*12.9898)*43758.5453; const rnd=(h-Math.floor(h))*2-1;
+    hr+=jit+rnd*2.2;
     hr=Math.max(min,Math.min(max,Math.round(hr)));
     res.push({t:t,hr:hr});
   }
@@ -3401,13 +3405,21 @@ function swimDetail(i){
       const rr=hr/m; let zi=0; if(rr>=0.80) zi=3; else if(rr>=0.70) zi=2; else if(rr>=0.60) zi=1;
       segs+='<polyline points="'+X(i)+','+Y(curve[i].hr)+' '+X(i+1)+','+Y(curve[i+1].hr)+'" fill="none" stroke="'+zstroke[zi]+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
     }
+    // —— 每个采样点画一个数据圆点（显示这是逐点实测，而非一根平滑曲线）——
+    let dots='';
+    if(curve.length<=80){
+      for(let i=0;i<curve.length;i++){
+        const rr=curve[i].hr/m; let zi=0; if(rr>=0.80) zi=3; else if(rr>=0.70) zi=2; else if(rr>=0.60) zi=1;
+        dots+='<circle cx="'+X(i)+'" cy="'+Y(curve[i].hr)+'" r="1.7" fill="#ffffff" stroke="'+zstroke[zi]+'" stroke-width="1"/>';
+      }
+    }
     // —— 平均心率参考线 ——
     const avg=Math.round(r.avgHR||((lo+hi)/2));
     let avgLine='';
     if(avg>=minHr && avg<=maxHr){
       const y=Y(avg);
       avgLine+='<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="#3f7d5c" stroke-width="1" stroke-dasharray="4 3"/>';
-      avgLine+='<text x="'+(w-padR)+'" y="'+(y-3)+'" text-anchor="end" font-size="8.5" font-weight="800" fill="#3f7d5c">平均 '+avg+'</text>';
+      avgLine+='<text x="'+(padL+4)+'" y="'+(y-3)+'" text-anchor="start" font-size="8.5" font-weight="800" fill="#3f7d5c">平均 '+avg+'</text>';
     }
     // —— 峰值 / 最低点标注 ——
     let maxI=0,minI=0;
@@ -3428,7 +3440,7 @@ function swimDetail(i){
       xax+='<text x="'+X(idx)+'" y="'+(h-7)+'" text-anchor="middle" font-size="8.5" fill="#aab0aa">'+curve[idx].t+'</text>';
     });
     hrSvg='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'
-      +bands+grid+zline+segs+avgLine+anno+xax
+      +bands+grid+zline+segs+dots+avgLine+anno+xax
       +'</svg>';
   }
 
