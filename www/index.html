@@ -296,7 +296,7 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .swimrow:last-child{border-bottom:none;}
 .swimrow .lab{color:var(--muted);}
 .swimrow .val{font-weight:900;color:var(--ink);}
-.hrbox{height:130px;position:relative;margin:8px 0 4px;}
+.hrbox{height:150px;position:relative;margin:8px 0 4px;}
 .hrbox svg{width:100%;height:100%;display:block;}
 .hrbox .hrline{fill:none;stroke:var(--teal);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 .hrbox .harea{fill:var(--teal);opacity:.12;}
@@ -3355,45 +3355,80 @@ function swimDetail(i){
   const zb=hrZoneBounds();
   let hrSvg='';
   if(curve.length>1){
-    const w=340,h=130,padL=30,padR=12,padT=14,padB=20;
+    const w=340,h=150,padL=34,padR=10,padT=12,padB=22;
     const m=hrRefMax();
     const lo=Math.min.apply(null,curve.map(function(p){return p.hr;}));
     const hi=Math.max.apply(null,curve.map(function(p){return p.hr;}));
-    const minHr=Math.floor((lo-6)/5)*5;
-    const maxHr=Math.ceil((hi+6)/5)*5;
-    const X=function(idx){ return padL+(idx/(curve.length-1))*(w-padL-padR); };
+    const minHr=Math.floor((lo-8)/10)*10;
+    const maxHr=Math.ceil((hi+8)/10)*10;
+    const CHARTW=w-padL-padR;
+    const X=function(idx){ return padL+(idx/(curve.length-1))*CHARTW; };
     const Y=function(hr){ return padT+(1-(hr-minHr)/(maxHr-minHr))*(h-padT-padB); };
-    // 区间色带背景（每块对应一个心率区间，颜色与下方图例一致）
+    // —— 区间色带背景 ——
     const zband=['#fbe3da','#fdf0d6','#dcecf8','#e8f3fb']; // Z4,Z3,Z2,Z1 由上而下
     let bands='';
     zb.slice().reverse().forEach(function(b,i){
       const yTop=Y(Math.min(b.hi,maxHr));
       const yBot=Y(Math.max(b.lo,minHr));
-      bands+='<rect x="'+padL+'" y="'+yTop+'" width="'+(w-padL-padR)+'" height="'+(yBot-yTop)+'" fill="'+zband[i]+'" opacity="0.6"/>';
+      bands+='<rect x="'+padL+'" y="'+yTop+'" width="'+CHARTW+'" height="'+(yBot-yTop)+'" fill="'+zband[i]+'" opacity="0.6"/>';
     });
-    // y 轴：各区间上边界 BPM
-    let yax='';
-    zb.forEach(function(b){
+    // —— 细网格（每 10 BPM）+ 左侧 BPM 刻度 ——
+    let grid='';
+    for(let g=Math.ceil(minHr/10)*10; g<=maxHr; g+=10){
+      const y=Y(g);
+      grid+='<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="#eeebe2" stroke-width="1"/>';
+      grid+='<text x="'+(padL-4)+'" y="'+(y+3)+'" text-anchor="end" font-size="8.5" fill="#aab0aa">'+g+'</text>';
+    }
+    // —— 区间边界虚线 + 区间名称标注 ——
+    const zname=['热身','燃脂','有氧','峰值'];
+    let zline='';
+    zb.forEach(function(b,bi){
       const y=Y(b.hi);
       if(y>padT+1 && y<h-padB-1){
-        yax+='<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="#ece9e0" stroke-width="1"/>';
-        yax+='<text x="'+(padL-4)+'" y="'+(y+3)+'" text-anchor="end" font-size="9" fill="#9aa09a">'+b.hi+'</text>';
+        zline+='<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="#d8d4ca" stroke-width="1" stroke-dasharray="3 3"/>';
+      }
+      const loC=Math.max(b.lo,minHr), hiC=Math.min(b.hi,maxHr);
+      const yc=Y((loC+hiC)/2);
+      if(yc>padT+7 && yc<h-padB-1){
+        zline+='<text x="'+(padL+CHARTW/2)+'" y="'+(yc+3)+'" text-anchor="middle" font-size="8.5" font-weight="800" fill="#8a908a">'+zname[bi]+'</text>';
       }
     });
-    // x 轴：起 / 中 / 末 时间
+    // —— 按区间分段着色的心率曲线（一眼看出各段落在哪个区间）——
+    const zstroke=['#8ec5ec','#4aa3e6','#e6a93f','#df5536']; // 低→高
+    let segs='';
+    for(let i=0;i<curve.length-1;i++){
+      const hr=(curve[i].hr+curve[i+1].hr)/2;
+      const rr=hr/m; let zi=0; if(rr>=0.80) zi=3; else if(rr>=0.70) zi=2; else if(rr>=0.60) zi=1;
+      segs+='<polyline points="'+X(i)+','+Y(curve[i].hr)+' '+X(i+1)+','+Y(curve[i+1].hr)+'" fill="none" stroke="'+zstroke[zi]+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+    }
+    // —— 平均心率参考线 ——
+    const avg=Math.round(r.avgHR||((lo+hi)/2));
+    let avgLine='';
+    if(avg>=minHr && avg<=maxHr){
+      const y=Y(avg);
+      avgLine+='<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="#3f7d5c" stroke-width="1" stroke-dasharray="4 3"/>';
+      avgLine+='<text x="'+(w-padR)+'" y="'+(y-3)+'" text-anchor="end" font-size="8.5" font-weight="800" fill="#3f7d5c">平均 '+avg+'</text>';
+    }
+    // —— 峰值 / 最低点标注 ——
+    let maxI=0,minI=0;
+    curve.forEach(function(p,i){ if(p.hr>curve[maxI].hr) maxI=i; if(p.hr<curve[minI].hr) minI=i; });
+    let anno='';
+    const yMax=Y(curve[maxI].hr), xMax=X(maxI);
+    const clipR = xMax > w-padR-30;
+    anno+='<circle cx="'+xMax+'" cy="'+yMax+'" r="3" fill="#df5536"/>';
+    anno+='<text x="'+(clipR?w-padR-30:xMax)+'" y="'+(yMax<padT+14?yMax+11:yMax-6)+'" text-anchor="'+(clipR?'end':'middle')+'" font-size="8.5" font-weight="800" fill="#df5536">峰值 '+curve[maxI].hr+'</text>';
+    const yMin=Y(curve[minI].hr), xMin=X(minI);
+    const labXmin = xMin < padL+22 ? padL+22 : xMin;
+    anno+='<circle cx="'+xMin+'" cy="'+yMin+'" r="2.6" fill="#4aa3e6"/>';
+    anno+='<text x="'+labXmin+'" y="'+(yMin>h-padB-14?yMin-9:yMin+11)+'" text-anchor="middle" font-size="8.5" font-weight="800" fill="#4aa3e6">最低 '+curve[minI].hr+'</text>';
+    // —— x 轴时间刻度（5 个）——
     let xax='';
-    [0,Math.floor((curve.length-1)/2),curve.length-1].forEach(function(idx){
-      xax+='<text x="'+X(idx)+'" y="'+(h-6)+'" text-anchor="middle" font-size="9" fill="#9aa09a">'+curve[idx].t+'</text>';
+    [0,0.25,0.5,0.75,1].forEach(function(f){
+      const idx=Math.round(f*(curve.length-1));
+      xax+='<text x="'+X(idx)+'" y="'+(h-7)+'" text-anchor="middle" font-size="8.5" fill="#aab0aa">'+curve[idx].t+'</text>';
     });
-    const pts=curve.map(function(p,idx){ return X(idx)+','+Y(p.hr); }).join(' ');
-    const area=pts+' '+X(curve.length-1)+','+(h-padB)+' '+X(0)+','+(h-padB);
-    let peak='';
-    curve.forEach(function(p,idx){ if(p.hr>=m*0.80){ peak+='<circle cx="'+X(idx)+'" cy="'+Y(p.hr)+'" r="2.3" fill="#e2694f"/>'; } });
     hrSvg='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'
-      +bands+yax
-      +'<polygon class="harea" points="'+area+'"/>'
-      +'<polyline class="hrline" points="'+pts+'"/>'
-      +peak+xax
+      +bands+grid+zline+segs+avgLine+anno+xax
       +'</svg>';
   }
 

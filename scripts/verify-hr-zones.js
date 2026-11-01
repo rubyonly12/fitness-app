@@ -33,15 +33,23 @@ const W = 393, H = 852, SAT = 59;
     if (window.enrichSwim) enrichSwim(S.hist[0]);
     swimDetail(0);
     const body = document.getElementById('swimDetailBody');
+    const svg = body.querySelector('.hrbox svg');
+    const texts = [...svg.querySelectorAll('text')].map(e => e.textContent);
     return {
       zoneCount: body.querySelectorAll('.zonerow').length,
       zoneTexts: [...body.querySelectorAll('.zonerow .ztext')].map(e => e.innerText.replace(/\s+/g, ' ')),
       barWidths: [...body.querySelectorAll('.zonerow .zbar i')].map(i => i.style.width),
       hasInfo: !!body.querySelector('h4 .info'),
       titleRange: (body.querySelector('h4 span:last-child') || {}).textContent,
-      rects: body.querySelectorAll('.hrbox svg rect').length,
-      texts: [...body.querySelectorAll('.hrbox svg text')].map(e => e.textContent),
-      peaks: body.querySelectorAll('.hrbox svg circle').length,
+      rects: svg.querySelectorAll('rect').length,
+      segPolylines: svg.querySelectorAll('polyline').length,
+      circles: svg.querySelectorAll('circle').length,
+      allTexts: texts,
+      hasAvg: texts.some(t => t.indexOf('平均') >= 0),
+      hasPeak: texts.some(t => t.indexOf('峰值') >= 0),
+      hasMin: texts.some(t => t.indexOf('最低') >= 0),
+      zoneNameLabels: ['热身', '燃脂', '有氧', '峰值'].filter(n => texts.some(t => t.indexOf(n) >= 0)),
+      bpmTicks: texts.filter(t => /^\d{2,3}$/.test(t)),
       hrRefMax: (window.hrRefMax ? hrRefMax() : 'n/a'),
       bounds: (window.hrZoneBounds ? hrZoneBounds().map(b => b.cat + ' ' + b.lo + '–' + b.hi) : 'n/a'),
     };
@@ -53,7 +61,11 @@ const W = 393, H = 852, SAT = 59;
   console.log('bounds =', JSON.stringify(data.bounds));
   console.log('zoneTexts =', JSON.stringify(data.zoneTexts, null, 0));
   console.log('barWidths =', JSON.stringify(data.barWidths));
-  console.log('chart rects(bands) =', data.rects, ' y/x labels =', JSON.stringify(data.texts), ' peaks =', data.peaks);
+  console.log('chart rects(bands) =', data.rects, ' segPolylines =', data.segPolylines, ' circles =', data.circles);
+  console.log('bpmTicks =', JSON.stringify(data.bpmTicks));
+  console.log('zoneNameLabels =', JSON.stringify(data.zoneNameLabels));
+  console.log('hasAvg/Peak/Min =', data.hasAvg, data.hasPeak, data.hasMin);
+  console.log('allTexts =', JSON.stringify(data.allTexts));
 
   // 截图：打开游泳详情并滚动到心率区间
   await page.evaluate(() => { document.getElementById('sub-swim-detail').classList.add('show'); });
