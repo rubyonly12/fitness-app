@@ -296,19 +296,20 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .swimrow:last-child{border-bottom:none;}
 .swimrow .lab{color:var(--muted);}
 .swimrow .val{font-weight:900;color:var(--ink);}
-.hrbox{height:120px;position:relative;margin:8px 0 4px;}
-.hrbox svg{width:100%;height:100%;}
+.hrbox{height:130px;position:relative;margin:8px 0 4px;}
+.hrbox svg{width:100%;height:100%;display:block;}
 .hrbox .hrline{fill:none;stroke:var(--teal);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 .hrbox .harea{fill:var(--teal);opacity:.12;}
 .hrbox .hgrid{stroke:#e0ddd4;stroke-width:1;}
-.zonerow{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13.5px;font-weight:800;border-bottom:1px solid #eceae1;}
+.zonerow{display:flex;align-items:center;gap:8px;padding:9px 0;font-size:13px;font-weight:800;border-bottom:1px solid #eceae1;}
 .zonerow:last-child{border-bottom:none;}
-.zonerow .zicon{width:26px;text-align:center;font-size:17px;}
-.zonerow .zname{width:42px;color:var(--ink);}
-.zonerow .zbar{flex:1;height:8px;background:#e8e8e0;border-radius:4px;overflow:hidden;}
-.zonerow .zbar i{display:block;height:100%;border-radius:4px;}
-.zonerow .zcat{width:70px;text-align:right;color:var(--muted);}
-.zonerow .zmin{width:42px;text-align:right;color:var(--ink);}
+.zonerow .zdot{width:12px;height:12px;border-radius:50%;flex:none;}
+.zonerow .zname{width:40px;color:var(--ink);flex:none;}
+.zonerow .zbar{flex:1;min-width:36px;height:9px;background:#eceae1;border-radius:5px;overflow:hidden;}
+.zonerow .zbar i{display:block;height:100%;border-radius:5px;}
+.zonerow .ztext{display:flex;flex-direction:column;align-items:flex-end;line-height:1.3;flex:none;width:104px;}
+.zonerow .ztext .zc{font-size:12.5px;font-weight:800;color:var(--ink);white-space:nowrap;}
+.zonerow .ztext .zr{font-size:10.5px;font-weight:800;color:var(--muted);white-space:nowrap;}
 .z1{background:#9ed2f5;}
 .z2{background:#6fc2f0;}
 .z3{background:#f7c46c;}
@@ -828,7 +829,7 @@ const DEFAULT = {
   ai:{url:'',key:'',model:''},
   menuLib:[],
   swim:{connected:false,hist:[]},
-  health:{connected:false,steps:0,exerciseMin:0,standH:0,hr:0,spo2:0,sleepH:0,
+  health:{connected:false,steps:0,exerciseMin:0,standH:0,hr:0,maxHr:0,spo2:0,sleepH:0,
           stepsWeek:[0,0,0,0,0,0,0],sleepWeek:[0,0,0,0,0,0,0]}
 };
 let state = load();
@@ -2964,10 +2965,11 @@ function openHealthSync(){
     + '<div class="mfield"><label>今日步数</label><input id="hSteps" type="number" value="'+H.steps+'"></div>'
     + '<div class="mfield"><label>锻炼（分钟）</label><input id="hEx" type="number" value="'+H.exerciseMin+'"></div></div>'
     + '<div class="mrow">'
-    + '<div class="mfield"><label>站立（小时）</label><input id="hStand" type="number" value="'+H.standH+'"></div>'
-    + '<div class="mfield"><label>静息心率 bpm</label><input id="hHr" type="number" value="'+H.hr+'"></div></div>'
+    + '<div class="mfield"><label>静息心率 bpm</label><input id="hHr" type="number" value="'+H.hr+'"></div>'
+    + '<div class="mfield"><label>最大心率 bpm</label><input id="hMax" type="number" placeholder="按年龄估算" value="'+H.maxHr+'"></div></div>'
     + '<div class="mrow">'
-    + '<div class="mfield"><label>血氧 %</label><input id="hSpo2" type="number" value="'+H.spo2+'"></div>'
+    + '<div class="mfield"><label>站立（小时）</label><input id="hStand" type="number" value="'+H.standH+'"></div>'
+    + '<div class="mfield"><label>血氧 %</label><input id="hSpo2" type="number" value="'+H.spo2+'"></div></div>'
     + '<div class="mfield"><label>睡眠（小时）</label><input id="hSleep" type="number" step="0.5" value="'+H.sleepH+'"></div></div>'
     + '<button class="btn-primary" style="margin-bottom:10px;" onclick="saveHealth()">保存并同步</button>'
     + '<button class="btn-ghost" style="width:100%;" onclick="demoHealth()">载入演示数据（预览界面效果）</button>');
@@ -2978,6 +2980,7 @@ function saveHealth(){
   H.exerciseMin=+document.getElementById('hEx').value||0;
   H.standH=+document.getElementById('hStand').value||0;
   H.hr=+document.getElementById('hHr').value||0;
+  H.maxHr=+document.getElementById('hMax').value||0;
   H.spo2=+document.getElementById('hSpo2').value||0;
   H.sleepH=+document.getElementById('hSleep').value||0;
   H.connected=true;
@@ -3084,12 +3087,38 @@ function fmtMins(m){
 function fmtMD(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
 function fmtHmFromDate(d){ const h=d.getHours(),m=d.getMinutes(); return (h<10?'0':'')+h+':'+(m<10?'0':'')+m; }
 
+// 参考最大心率：心率区间按「占最大心率的百分比」划分，需要一个稳定的参考值。
+// 优先用用户在「连接 Apple Health」里填写的最大心率；否则按常用估算 190（≈30 岁）。
+function hrRefMax(){
+  const v=state&&state.health&&state.health.maxHr;
+  if(v&&v>=120) return Math.round(v);
+  return 190;
+}
+// 4 个心率区间边界（按最大心率百分比的常见健身分区模型）
+function hrZoneBounds(){
+  const m=hrRefMax();
+  return [
+    {lo:Math.round(m*0.50), hi:Math.round(m*0.60), pct:'50–60%',  cat:'热身活动'},
+    {lo:Math.round(m*0.60), hi:Math.round(m*0.70), pct:'60–70%',  cat:'燃脂减肥'},
+    {lo:Math.round(m*0.70), hi:Math.round(m*0.80), pct:'70–80%',  cat:'有氧健身'},
+    {lo:Math.round(m*0.80), hi:m,                  pct:'80–100%', cat:'峰值极限'}
+  ];
+}
+// 由真实心率曲线 + 参考最大心率，统计各区间停留分钟数。
+// 返回顺序固定为 [区间4, 区间3, 区间2, 区间1]，与详情页的展示顺序一致。
 function genHrZones(mins,avg,max){
-  const z1=Math.round(mins*0.55);
-  const z2=Math.round(mins*0.25);
-  const z3=Math.round(mins*0.12);
-  const z4=Math.max(0,mins-z1-z2-z3);
-  return [Math.max(0,z1),Math.max(0,z2),Math.max(0,z3),Math.max(0,z4)];
+  const min=Math.round((avg||120)-16);
+  const curve=genHrCurve('18:00',mins,avg,max,min);
+  const m=hrRefMax();
+  const z=[0,0,0,0]; // 位置 0=区间4 … 3=区间1
+  curve.forEach(function(p){
+    const r=p.hr/m;
+    let idx=0; // Z1 热身
+    if(r>=0.80) idx=3; else if(r>=0.70) idx=2; else if(r>=0.60) idx=1;
+    z[3-idx]++;
+  });
+  const step=Math.max(1,Math.floor(mins/30));
+  return z.map(function(v){ return Math.round(v*step); });
 }
 function genHrCurve(t0,mins,avg,max,min){
   const res=[];
@@ -3323,42 +3352,72 @@ function swimDetail(i){
   const intenLabel=inten<4?'轻松':inten<6?'中等':inten<8?'较高':'高强度';
 
   const curve=r.hrCurve||[];
+  const zb=hrZoneBounds();
   let hrSvg='';
   if(curve.length>1){
-    const w=340, h=110, pad=24;
-    const minHr=Math.min.apply(null,curve.map(function(p){return p.hr;}).concat([r.hrMin||100]))-5;
-    const maxHr=Math.max.apply(null,curve.map(function(p){return p.hr;}).concat([r.maxHR||150]))+5;
-    const pts=curve.map(function(p,idx){
-      const x=pad+(idx/(curve.length-1))*(w-pad*2);
-      const y=h-pad-((p.hr-minHr)/(maxHr-minHr))*(h-pad*2);
-      return x+','+y;
-    }).join(' ');
-    const area=pts+' '+(w-pad)+','+(h-pad)+' '+pad+','+(h-pad);
+    const w=340,h=130,padL=30,padR=12,padT=14,padB=20;
+    const m=hrRefMax();
+    const lo=Math.min.apply(null,curve.map(function(p){return p.hr;}));
+    const hi=Math.max.apply(null,curve.map(function(p){return p.hr;}));
+    const minHr=Math.floor((lo-6)/5)*5;
+    const maxHr=Math.ceil((hi+6)/5)*5;
+    const X=function(idx){ return padL+(idx/(curve.length-1))*(w-padL-padR); };
+    const Y=function(hr){ return padT+(1-(hr-minHr)/(maxHr-minHr))*(h-padT-padB); };
+    // 区间色带背景（每块对应一个心率区间，颜色与下方图例一致）
+    const zband=['#fbe3da','#fdf0d6','#dcecf8','#e8f3fb']; // Z4,Z3,Z2,Z1 由上而下
+    let bands='';
+    zb.slice().reverse().forEach(function(b,i){
+      const yTop=Y(Math.min(b.hi,maxHr));
+      const yBot=Y(Math.max(b.lo,minHr));
+      bands+='<rect x="'+padL+'" y="'+yTop+'" width="'+(w-padL-padR)+'" height="'+(yBot-yTop)+'" fill="'+zband[i]+'" opacity="0.6"/>';
+    });
+    // y 轴：各区间上边界 BPM
+    let yax='';
+    zb.forEach(function(b){
+      const y=Y(b.hi);
+      if(y>padT+1 && y<h-padB-1){
+        yax+='<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="#ece9e0" stroke-width="1"/>';
+        yax+='<text x="'+(padL-4)+'" y="'+(y+3)+'" text-anchor="end" font-size="9" fill="#9aa09a">'+b.hi+'</text>';
+      }
+    });
+    // x 轴：起 / 中 / 末 时间
+    let xax='';
+    [0,Math.floor((curve.length-1)/2),curve.length-1].forEach(function(idx){
+      xax+='<text x="'+X(idx)+'" y="'+(h-6)+'" text-anchor="middle" font-size="9" fill="#9aa09a">'+curve[idx].t+'</text>';
+    });
+    const pts=curve.map(function(p,idx){ return X(idx)+','+Y(p.hr); }).join(' ');
+    const area=pts+' '+X(curve.length-1)+','+(h-padB)+' '+X(0)+','+(h-padB);
+    let peak='';
+    curve.forEach(function(p,idx){ if(p.hr>=m*0.80){ peak+='<circle cx="'+X(idx)+'" cy="'+Y(p.hr)+'" r="2.3" fill="#e2694f"/>'; } });
     hrSvg='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'
-      +'<line class="hgrid" x1="'+pad+'" y1="'+(h-pad)+'" x2="'+(w-pad)+'" y2="'+(h-pad)+'"/>'
-      +'<line class="hgrid" x1="'+pad+'" y1="'+pad+'" x2="'+(w-pad)+'" y2="'+pad+'"/>'
+      +bands+yax
       +'<polygon class="harea" points="'+area+'"/>'
       +'<polyline class="hrline" points="'+pts+'"/>'
+      +peak+xax
       +'</svg>';
   }
 
   const z=r.hrZones||[0,0,0,0];
   const zsum=z.reduce(function(a,b){return a+b;},0)||1;
-  const zPct=z.map(function(x){return Math.round(x/zsum*100);});
 
   const metsLabel=swimMetsLabel(inten);
   const zoneRows=[
-    {i:4,icon:'🏃',name:'区间 4',cls:'z4',cat:'峰值极限'},
-    {i:3,icon:'🚶',name:'区间 3',cls:'z3',cat:'有氧健身'},
-    {i:2,icon:'🏊',name:'区间 2',cls:'z2',cat:'燃脂减肥'},
-    {i:1,icon:'🧘',name:'区间 1',cls:'z1',cat:'热身活动'}
+    {i:4,cls:'z4',bi:3},
+    {i:3,cls:'z3',bi:2},
+    {i:2,cls:'z2',bi:1},
+    {i:1,cls:'z1',bi:0}
   ];
-  const zHtml=zoneRows.map(function(row,idx){
+  const zHtml=zoneRows.map(function(row){
     const mins=z[4-row.i]||0;
-    const pct=zsum?Math.round(mins/zsum*100):0;
-    return '<div class="zonerow"><span class="zicon">'+row.icon+'</span><span class="zname">'+row.name+'</span>'
+    const pct=Math.round(mins/zsum*100);
+    const b=zb[row.bi];
+    return '<div class="zonerow">'
+      +'<span class="zdot '+row.cls+'"></span>'
+      +'<span class="zname">区间 '+row.i+'</span>'
       +'<div class="zbar"><i class="'+row.cls+'" style="width:'+pct+'%;"></i></div>'
-      +'<span class="zcat">'+row.cat+'</span><span class="zmin">'+mins+'分</span></div>';
+      +'<span class="ztext"><span class="zc">'+b.cat+' '+b.lo+'–'+b.hi+'</span>'
+      +'<span class="zr">'+mins+'分 · '+pct+'%</span></span>'
+      +'</div>';
   }).join('');
 
   document.getElementById('swimDetailBody').innerHTML=
@@ -3387,7 +3446,7 @@ function swimDetail(i){
     +'<div class="swimrow"><span class="lab">最大心率</span><span class="val">'+(r.maxHR||0)+' BPM</span></div>'
     +'</div>'
     +'<div class="swimsect">'
-    +'<h4>心率区间 <span style="font-size:12px;font-weight:800;color:var(--muted);margin-left:auto;">'+(r.hrMin||0)+' - '+(r.maxHR||0)+' BPM</span></h4>'
+    +'<h4>心率区间 <span class="info" onclick="openHrZoneInfo()" title="心率区间说明">ⓘ</span><span style="font-size:12px;font-weight:800;color:var(--muted);margin-left:auto;">'+(r.hrMin||0)+' - '+(r.maxHR||0)+' BPM</span></h4>'
     +'<div class="hrbox">'+hrSvg+'</div>'
     +zHtml
     +'</div>'
@@ -3402,6 +3461,20 @@ function openSwimIntensity(){
     + '<div class="metsrow"><span class="ic">🏃</span><span class="txt">高强度</span><span class="val">> 6.0 METs</span></div>'
     + '</div>'
     + '<p class="note" style="font-size:13px;font-weight:700;color:#5d665f;line-height:1.6;margin-bottom:14px;">MET（Metabolic equivalent）即代谢当量，是一种表示相对能量代谢水平和运动强度的重要指标。<br><br>1 个 MET 相当于健康成年人安静状态下坐着的水平，因此你的运动强度可以跟静坐相对比。本应用根据你的游泳配速与平均心率自动估算 METs。</p>'
+    + '<button class="btn-primary" style="width:100%;" onclick="closeModal()">好的</button>');
+}
+function openHrZoneInfo(){
+  const zb=hrZoneBounds(), m=hrRefMax();
+  const rows=zb.map(function(b){
+    return '<div class="metsrow"><span class="ic" style="color:#fff;background:'+['#9ed2f5','#6fc2f0','#f7c46c','#e2694f'][zb.indexOf(b)]+';">❤</span>'
+      +'<span class="txt">'+b.cat+'</span>'
+      +'<span class="val">'+b.lo+'–'+b.hi+' BPM · '+b.pct+'</span></div>';
+  }).join('');
+  openModal('<h3>❤️ 心率区间怎么算</h3>'
+    + '<div class="metslist">'+rows+'</div>'
+    + '<p class="note" style="font-size:13px;font-weight:700;color:#5d665f;line-height:1.7;margin-bottom:14px;">心率区间按「占最大心率的百分比」划分（常见健身分区模型）。当前参考最大心率为 <b>'+m+' BPM</b>：'
+    + '可在「设置 → 连接 Apple Health」里填写你的最大心率，留空则按年龄估算。<br><br>'
+    + '曲线下方色带即对应这 4 个区间；曲线落在哪个色带，就计入哪个区间的停留时长。峰值（≥80% 最大心率）处用红点标出。</p>'
     + '<button class="btn-primary" style="width:100%;" onclick="closeModal()">好的</button>');
 }
 
