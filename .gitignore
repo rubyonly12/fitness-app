@@ -11,3 +11,7 @@ certs/
 
 # not needed for the iOS cloud build
 android/
+
+# local build artifacts & verification screenshots (not source — must not be committed)
+builds/
+hr-zones.png
