@@ -298,6 +298,11 @@ h1.pgtitle{font-size:29px;font-weight:900;letter-spacing:.5px;margin:14px 0 4px;
 .swimrow .val{font-weight:900;color:var(--ink);}
 .hrbox{height:150px;position:relative;margin:8px 0 4px;}
 .hrbox svg{width:100%;height:100%;display:block;}
+.hrbox .hr-nodata{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px 18px;background:#f7f6f1;border:1px dashed #ded9cc;border-radius:12px;}
+.hrbox .hr-nodata .ic{font-size:26px;line-height:1;margin-bottom:6px;filter:grayscale(.4);}
+.hrbox .hr-nodata .t{font-size:13px;font-weight:900;color:#6d766e;margin-bottom:5px;}
+.hrbox .hr-nodata .d{font-size:10.5px;font-weight:700;color:#9a9f97;line-height:1.6;}
+.hr-realnote{font-size:10.5px;font-weight:800;color:#3f7d5c;background:#eef6f0;border-radius:8px;padding:6px 9px;margin:2px 0 8px;line-height:1.5;}
 .hrbox .hrline{fill:none;stroke:var(--teal);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 .hrbox .harea{fill:var(--teal);opacity:.12;}
 .hrbox .hgrid{stroke:#e0ddd4;stroke-width:1;}
@@ -2834,7 +2839,8 @@ function enrichSwimStylesFromHealth(){
     applySwimHrFromHealth();
   }catch(e){ console.warn('stroke init', e); }
 }
-/* 用 HealthKit 心率样本计算每次游泳的真实平均/最大心率（此前是按强度估算的假值）
+/* 用 HealthKit 逐样本心率还原每次游泳的真实数据（平均/最大/最低、心率曲线、各区间停留时长）
+   全部数值都来自 Apple Watch 实测样本；没有任何样本时不生成模拟数据，而是显式标记 hrRealSamples=[]。
    注意：原生 querySampleType 默认 limit=1000 且按 endDate 降序返回，
    如果把「所有游泳」合成一个大时间窗去查，早期的心率样本会被 limit 截掉。
    因此这里对每条记录单独查询它自己的时间窗，互不干扰，也天然避开截断。 */
@@ -2854,28 +2860,37 @@ function applySwimHrFromHealth(){
       const rs=new Date(r.start).getTime(), re=new Date(r.end).getTime();
       if(isNaN(rs)||isNaN(re)||re<=rs) return;
       pending++;
-      // 前后各放宽 1 分钟，容忍 Apple Watch 心率采样点略微落在训练区间之外
+      // 前后各放宽 1 分钟查询，容忍 Apple Watch 心率采样点略微落在训练区间之外，
+      // 但统计时仍严格只认落在 [rs, re] 内的样本。
       h.query({startDate:new Date(rs-60000), endDate:new Date(re+60000),
                dataType:'heart_rate', unit:'bpm', limit:2000}, function(arr){
         try{
-          let sum=0,cnt=0,mx=0;
+          const samples=[];
           (arr||[]).forEach(function(s){
             const t=new Date(s.startDate||s.start).getTime();
             if(isNaN(t)||t<rs||t>re) return;      // 只认落在本次训练区间内的样本
             const v=parseFloat(s.quantity!=null?s.quantity:s.value);
             if(!(v>0)) return;
-            sum+=v; cnt++; if(v>mx) mx=v;
+            samples.push({t:t, hr:Math.round(v)});
           });
-          if(cnt){
-            const avg=Math.round(sum/cnt);
-            const maxV=Math.max(mx,avg);
-            if(r.avgHR!==avg || r.maxHR!==maxV){
-              r.avgHR=avg; r.maxHR=maxV;
-              r.hrMin=Math.round(avg-16);
-              r.hrZones=genHrZones(r.mins,r.avgHR,r.maxHR);
-              r.hrCurve=genHrCurve(r.t0||'18:00',r.mins,r.avgHR,r.maxHR,r.hrMin);
-              upd++;
+          const real=buildRealHrData(samples, rs, re, r.t0||'18:00');
+          // 无样本时也写回，确保旧的模拟曲线/区间被清掉，不再冒充真实数据
+          const changed = real
+            ? r.avgHR!==real.avg || r.maxHR!==real.max || !r.hrReal || r.hrSampleCount!==real.samples.length
+            : (r.hrReal===true || (r.hrCurve&&r.hrCurve.length));
+          if(changed){
+            if(real){
+              r.avgHR=real.avg; r.maxHR=real.max; r.hrMin=real.min;
+              r.hrZones=real.zones; r.hrCurve=real.curve;
+              r.hrReal=true; r.hrSampleCount=real.samples.length;
+              r.hrRealMin=real.realMin; r.hrRealMax=real.realMax;
+            }else{
+              r.avgHR=0; r.maxHR=0; r.hrMin=0;
+              r.hrZones=[0,0,0,0]; r.hrCurve=[];
+              r.hrReal=false; r.hrSampleCount=0;
+              r.hrRealMin=0; r.hrRealMax=0;
             }
+            upd++;
           }
         }catch(e){ console.warn('hr calc', e); }
         if(--pending<=0) finish();
@@ -3104,40 +3119,68 @@ function hrZoneBounds(){
     {lo:Math.round(m*0.80), hi:m,                  pct:'80–100%', cat:'峰值极限'}
   ];
 }
-// 由真实心率曲线 + 参考最大心率，统计各区间停留分钟数。
-// 返回顺序固定为 [区间4, 区间3, 区间2, 区间1]，与详情页的展示顺序一致。
-function genHrZones(mins,avg,max){
-  const min=Math.round((avg||120)-16);
-  const curve=genHrCurve('18:00',mins,avg,max,min);
-  const m=hrRefMax();
-  const z=[0,0,0,0]; // 位置 0=区间4 … 3=区间1
-  curve.forEach(function(p){
-    const r=p.hr/m;
-    let idx=0; // Z1 热身
-    if(r>=0.80) idx=3; else if(r>=0.70) idx=2; else if(r>=0.60) idx=1;
-    z[3-idx]++;
-  });
-  const step=Math.max(1,Math.floor(mins/30));
-  return z.map(function(v){ return Math.round(v*step); });
+// 区域归属：返回 0/1/2/3 = 区间1(热身)/2(燃脂)/3(有氧)/4(峰值)
+function hrZoneIdx(hr,m){
+  const r=hr/m;
+  if(r>=0.80) return 3;
+  if(r>=0.70) return 2;
+  if(r>=0.60) return 1;
+  return 0;
 }
-function genHrCurve(t0,mins,avg,max,min){
-  const res=[];
-  const parts=t0.split(':'); const base=parseInt(parts[0],10)*60+parseInt(parts[1],10);
-  const step=Math.max(1,Math.floor(mins/30));
-  for(let i=0;i<=mins;i+=step){
-    const t=fmtHm(base+i);
-    const phase=i/mins;
-    let hr=avg+Math.sin(phase*Math.PI*3)*5+Math.cos(phase*Math.PI*2)*3;
-    if(i<5) hr=min+(avg-min)*(i/5);
-    if(i>mins-5) hr=avg+(max-avg)*((i-(mins-5))/5);
-    // 真实心率细节：确定性的逐点微波动，使线条呈现真实起伏而非平滑曲线
-    const jit=Math.sin(i*1.7)*2.2+Math.sin(i*4.3+0.7)*1.4;
-    const h=Math.sin(i*12.9898)*43758.5453; const rnd=(h-Math.floor(h))*2-1;
-    hr+=jit+rnd*2.2;
-    hr=Math.max(min,Math.min(max,Math.round(hr)));
-    res.push({t:t,hr:hr});
+/* 由 HealthKit 的真实逐样本心率，生成曲线 + 区间停留时长。
+   samples: [{t:毫秒时间戳, hr:bpm}] 已限定在训练时间窗内；
+   rs/re: 训练真实起止毫秒；t0: 训练开始时钟，用于样本时间轴标签。
+   返回 null 表示没有任何真实样本（调用方据此显示「无数据」，绝不生成模拟曲线）。 */
+function buildRealHrData(samples, rs, re, t0){
+  if(!samples || !samples.length) return null;
+  // 按时间升序（原生默认按 endDate 降序返回）
+  const pts=samples.slice().sort(function(a,b){ return a.t-b.t; });
+  // 去重：同一秒有多个来源样本时取均值，避免密集点导致折线锯齿爆炸
+  const dedup=[];
+  pts.forEach(function(p){
+    const last=dedup[dedup.length-1];
+    if(last && Math.abs(p.t-last.t)<1000){ last.hr=Math.round((last.hr+p.hr)/2); }
+    else dedup.push({t:p.t, hr:p.hr});
+  });
+  const m=hrRefMax();
+  const span=re-rs;
+  // —— 真实曲线：每个采样点按「真实时间偏移」定位，不是等距分布 ——
+  const base=(function(){ const a=(t0||'18:00').split(':'); return parseInt(a[0],10)*60+parseInt(a[1],10); })();
+  const curve=dedup.map(function(p){
+    const offMin=(p.t-rs)/60000;           // 训练开始后的真实分钟偏移
+    return {t:fmtHm(Math.round(base+offMin)), hr:p.hr, off:offMin};
+  });
+  // —— 区间停留时长：把相邻两点之间的时间，按真实心率归入对应区间 ——
+  const z=[0,0,0,0]; // 位置0=区间4 … 3=区间1
+  let inWindow=0;
+  for(let i=0;i<dedup.length;i++){
+    const tA=dedup[i].t;
+    const tB=(i<dedup.length-1)?dedup[i+1].t:re;   // 末点延伸到训练结束
+    let dt=(tB-tA)/60000;
+    if(dt<0) dt=0;
+    if(dt>span/60000) dt=span/60000;               // 异常大间隔夹断
+    const hr=dedup[i].hr;
+    z[3-hrZoneIdx(hr,m)]+=dt;
+    inWindow+=dt;
   }
-  return res;
+  const zones=z.map(function(v){ return Math.round(v); });
+  // —— 真实平均(时间加权)/最大/最低 ——
+  let wsum=0,wt=0,mx=0,mn=999;
+  for(let i=0;i<dedup.length;i++){
+    const tA=dedup[i].t;
+    const tB=(i<dedup.length-1)?dedup[i+1].t:re;
+    let dt=(tB-tA)/60000; if(dt<0||dt>span/60000) dt=0;
+    wsum+=dedup[i].hr*dt; wt+=dt;
+    if(dedup[i].hr>mx) mx=dedup[i].hr;
+    if(dedup[i].hr<mn) mn=dedup[i].hr;
+  }
+  const avg=wt>0?Math.round(wsum/wt):Math.round(dedup.reduce(function(a,p){return a+p.hr;},0)/dedup.length);
+  return {
+    samples:dedup, curve:curve, zones:zones,
+    avg:Math.max(avg,mn), max:Math.max(mx,avg), min:mn,
+    realMin:mn, realMax:mx,
+    coveredMin:Math.round(inWindow)
+  };
 }
 function swimMets(rec){
   // 代谢当量估算：参考游泳运动的 METs 范围（休闲约 6，中等 8，剧烈 10+）
@@ -3168,11 +3211,11 @@ function enrichSwim(r){
   if(!r.laps) r.laps = r.openWater ? 0 : Math.round(r.dist/(r.poolLen||25));
   if(!r.strokes) r.strokes=Math.round(r.dist*0.33);
   if(!r.strokeFreq) r.strokeFreq=+(r.strokes/r.mins).toFixed(1);
-  if(!r.avgHR) r.avgHR=Math.round(105+r.intensity*1.4);
-  if(!r.maxHR) r.maxHR=Math.round(r.avgHR+14);
-  if(!r.hrMin) r.hrMin=Math.round(r.avgHR-16);
-  if(!r.hrZones) r.hrZones=genHrZones(r.mins,r.avgHR,r.maxHR);
-  if(!r.hrCurve) r.hrCurve=genHrCurve(r.t0||'18:00',r.mins,r.avgHR,r.maxHR,r.hrMin);
+  // 心率相关字段一律不在此处合成：真实值只来自 HealthKit 逐样本（见 applySwimHrFromHealth）。
+  // 手动/演示记录没有真实采样，hrReal=false，详情页会显示「无 Apple Watch 采样数据」而非模拟曲线。
+  if(r.hrReal===undefined) r.hrReal=false;
+  if(!r.hrZones) r.hrZones=[0,0,0,0];
+  if(!r.hrCurve) r.hrCurve=[];
   if(!r.t0 || !r.t1){
     const base=18*60;
     r.t0=fmtHm(base); r.t1=fmtHm(base+r.mins);
@@ -3355,10 +3398,19 @@ function swimDetail(i){
   const inten=swimIntensity(r);
   const intenLabel=inten<4?'轻松':inten<6?'中等':inten<8?'较高':'高强度';
 
-  const curve=r.hrCurve||[];
+  // 只使用 HealthKit 真实逐样本数据；hrReal!==true 时绝不生成模拟曲线
+  const curve=(r.hrReal===true)?(r.hrCurve||[]):[];
+  const hasReal=curve.length>1;
+  const sampleN=r.hrSampleCount||curve.length;
   const zb=hrZoneBounds();
   let hrSvg='';
-  if(curve.length>1){
+  if(!hasReal){
+    hrSvg='<div class="hr-nodata"><div class="ic">⌚</div>'
+      +'<div class="t">暂无真实心率采样数据</div>'
+      +'<div class="d">这条记录没有来自 Apple Watch 的心率样本，因此不显示心率曲线与区间时长。<br>游泳时佩戴 Apple Watch，并在「设置 → 连接 Apple Health」中授权「心率」后重新同步即可获得真实数据。</div>'
+      +'</div>';
+  }
+  if(hasReal){
     const w=340,h=150,padL=34,padR=10,padT=12,padB=22;
     const m=hrRefMax();
     const lo=Math.min.apply(null,curve.map(function(p){return p.hr;}));
@@ -3366,7 +3418,11 @@ function swimDetail(i){
     const minHr=Math.floor((lo-8)/10)*10;
     const maxHr=Math.ceil((hi+8)/10)*10;
     const CHARTW=w-padL-padR;
-    const X=function(idx){ return padL+(idx/(curve.length-1))*CHARTW; };
+    // 横轴按「真实时间偏移」定位：Apple Watch 采样并非等间隔，不能用索引等距代替
+    const offs=curve.map(function(p){ return p.off||0; });
+    const offMin=Math.min.apply(null,offs), offMax=Math.max.apply(null,offs);
+    const offSpan=(offMax-offMin)||1;
+    const X=function(idx){ return padL+((offs[idx]-offMin)/offSpan)*CHARTW; };
     const Y=function(hr){ return padT+(1-(hr-minHr)/(maxHr-minHr))*(h-padT-padB); };
     // —— 区间色带背景 ——
     const zband=['#fbe3da','#fdf0d6','#dcecf8','#e8f3fb']; // Z4,Z3,Z2,Z1 由上而下
@@ -3430,14 +3486,22 @@ function swimDetail(i){
     anno+='<circle cx="'+xMax+'" cy="'+yMax+'" r="3" fill="#df5536"/>';
     anno+='<text x="'+(clipR?w-padR-30:xMax)+'" y="'+(yMax<padT+14?yMax+11:yMax-6)+'" text-anchor="'+(clipR?'end':'middle')+'" font-size="8.5" font-weight="800" fill="#df5536">峰值 '+curve[maxI].hr+'</text>';
     const yMin=Y(curve[minI].hr), xMin=X(minI);
-    const labXmin = xMin < padL+22 ? padL+22 : xMin;
+    // 最低点多落在「热身」色带，其名称标注在色带中央；若最低标签靠近中央就右移，避免文字重叠
+    const centerX=padL+CHARTW/2;
+    let labXmin=xMin;
+    if(Math.abs(labXmin-centerX)<48) labXmin=centerX+48;
+    labXmin=Math.max(padL+22, Math.min(w-padR-30, labXmin));
     anno+='<circle cx="'+xMin+'" cy="'+yMin+'" r="2.6" fill="#4aa3e6"/>';
     anno+='<text x="'+labXmin+'" y="'+(yMin>h-padB-14?yMin-9:yMin+11)+'" text-anchor="middle" font-size="8.5" font-weight="800" fill="#4aa3e6">最低 '+curve[minI].hr+'</text>';
-    // —— x 轴时间刻度（5 个）——
+    // —— x 轴时间刻度（5 个，按真实时间偏移取最近样本）——
     let xax='';
     [0,0.25,0.5,0.75,1].forEach(function(f){
-      const idx=Math.round(f*(curve.length-1));
-      xax+='<text x="'+X(idx)+'" y="'+(h-7)+'" text-anchor="middle" font-size="8.5" fill="#aab0aa">'+curve[idx].t+'</text>';
+      const target=offMin+f*offSpan;
+      let idx=0,best=Infinity;
+      offs.forEach(function(o,k){ const d=Math.abs(o-target); if(d<best){best=d;idx=k;} });
+      const x=X(idx);
+      const anchor='middle';
+      xax+='<text x="'+x+'" y="'+(h-7)+'" text-anchor="'+anchor+'" font-size="8.5" fill="#aab0aa">'+curve[idx].t+'</text>';
     });
     hrSvg='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'
       +bands+grid+zline+segs+dots+avgLine+anno+xax
@@ -3454,7 +3518,7 @@ function swimDetail(i){
     {i:2,cls:'z2',bi:1},
     {i:1,cls:'z1',bi:0}
   ];
-  const zHtml=zoneRows.map(function(row){
+  const zHtml=hasReal?zoneRows.map(function(row){
     const mins=z[4-row.i]||0;
     const pct=Math.round(mins/zsum*100);
     const b=zb[row.bi];
@@ -3465,7 +3529,13 @@ function swimDetail(i){
       +'<span class="ztext"><span class="zc">'+b.cat+' '+b.lo+'–'+b.hi+'</span>'
       +'<span class="zr">'+mins+'分 · '+pct+'%</span></span>'
       +'</div>';
-  }).join('');
+  }).join(''):'';
+  const hrHeadNote=hasReal
+    ? '<span style="font-size:12px;font-weight:800;color:var(--muted);margin-left:auto;">'+Math.min(r.hrMin||0,r.hrRealMin||0)+' - '+(r.maxHR||0)+' BPM</span>'
+    : '<span style="font-size:11px;font-weight:800;color:var(--muted);margin-left:auto;">Apple Watch 实测</span>';
+  const realBadge=hasReal
+    ? '<div class="hr-realnote">✅ 真实数据 · 来自 Apple Watch 的 '+sampleN+' 个心率采样点，按实际采样时间绘制</div>'
+    : '';
 
   document.getElementById('swimDetailBody').innerHTML=
     '<div class="swimhero">'
@@ -3489,12 +3559,13 @@ function swimDetail(i){
     +'<div class="swimrow"><span class="lab">泳姿</span><span class="val">'+(r.style||'游泳')+'</span></div>'
     +'<div class="swimrow"><span class="lab">泳池长度</span><span class="val">'+(r.openWater?'公开水域':((r.poolLen||25)+' 米'))+'</span></div>'
     +'<div class="swimrow"><span class="lab">划水频率</span><span class="val">'+(r.strokeFreq||0)+' 次/分钟</span></div>'
-    +'<div class="swimrow"><span class="lab">平均心率</span><span class="val">'+(r.avgHR||0)+' BPM</span></div>'
-    +'<div class="swimrow"><span class="lab">最大心率</span><span class="val">'+(r.maxHR||0)+' BPM</span></div>'
+    +'<div class="swimrow"><span class="lab">平均心率</span><span class="val">'+(hasReal?(r.avgHR||0)+' BPM':'—')+'</span></div>'
+    +'<div class="swimrow"><span class="lab">最大心率</span><span class="val">'+(hasReal?(r.maxHR||0)+' BPM':'—')+'</span></div>'
     +'</div>'
     +'<div class="swimsect">'
-    +'<h4>心率区间 <span class="info" onclick="openHrZoneInfo()" title="心率区间说明">ⓘ</span><span style="font-size:12px;font-weight:800;color:var(--muted);margin-left:auto;">'+(r.hrMin||0)+' - '+(r.maxHR||0)+' BPM</span></h4>'
+    +'<h4>心率区间 <span class="info" onclick="openHrZoneInfo()" title="心率区间说明">ⓘ</span>'+hrHeadNote+'</h4>'
     +'<div class="hrbox">'+hrSvg+'</div>'
+    +realBadge
     +zHtml
     +'</div>'
     +'<button class="btn-primary" style="background:#c0563f;margin:8px 0 10px;" onclick="delSwim()">删除这条记录</button>';
@@ -3521,7 +3592,8 @@ function openHrZoneInfo(){
     + '<div class="metslist">'+rows+'</div>'
     + '<p class="note" style="font-size:13px;font-weight:700;color:#5d665f;line-height:1.7;margin-bottom:14px;">心率区间按「占最大心率的百分比」划分（常见健身分区模型）。当前参考最大心率为 <b>'+m+' BPM</b>：'
     + '可在「设置 → 连接 Apple Health」里填写你的最大心率，留空则按年龄估算。<br><br>'
-    + '曲线下方色带即对应这 4 个区间；曲线落在哪个色带，就计入哪个区间的停留时长。峰值（≥80% 最大心率）处用红点标出。</p>'
+    + '曲线、峰值/最低、各区间停留时长<b>全部来自 Apple Watch 的真实心率采样点</b>，按实际采样时间绘制；没有采样数据的记录会明确显示「暂无真实心率采样数据」，不会用模拟值代替。<br><br>'
+    + '曲线下方色带对应这 4 个区间；心率落在哪个色带，就把对应的采样时间计入该区间。峰值（≥80% 参考最大心率）处用红点标出。若你的真实最大心率低于参考值的 80%，峰值区间会显示 0 分，属正常结果。</p>'
     + '<button class="btn-primary" style="width:100%;" onclick="closeModal()">好的</button>');
 }
 
